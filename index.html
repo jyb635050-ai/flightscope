@@ -219,7 +219,6 @@
         <h1>FlightScope</h1>
         <p data-i18n="tagline">直飞航线探索</p>
       </div>
-      <span class="demo-chip" data-i18n="demoChip">示例数据</span>
     </div>
 
     <div class="search-zone">
@@ -317,7 +316,7 @@ var I18N = {
     emptyInit:'输入出发机场，探索全球直飞航线<br>或点击上方热门出发地快速开始',
     emptyNoRoute:'暂无该航线的直飞记录<br>可尝试更换目的地，或查看出发地的全部直飞网络',
     emptyNeedOrigin:'请先选择出发地',
-    dscTitle:'示例数据说明',
+    dscTitle:'数据说明',
     dscBody:'航线拓扑来自 OpenFlights 开放数据集（历史存量，约 2014 年，部分航线已变动）；机型取自该数据集的真实执飞机型记录；航班号、时刻、票价为规则生成的参考值，非实时。预订前请以航司官网为准。',
     mapLoad:'正在构建地图', rotOn:'旋转中', rotOff:'已暂停', reset:'重置',
     hint:'拖拽旋转 · 滚轮缩放 · 悬停/点击目的地', noWebgl:'此浏览器不支持 WebGL',
@@ -337,7 +336,7 @@ var I18N = {
     emptyInit:'Enter a departure airport to explore nonstop routes<br>or tap a popular origin above',
     emptyNoRoute:'No nonstop service found on this route<br>Try another destination, or browse all nonstop routes',
     emptyNeedOrigin:'Please select a departure airport first',
-    dscTitle:'About this demo data',
+    dscTitle:'Data notes',
     dscBody:'Route topology from the OpenFlights open dataset (historical, ~2014; some routes have since changed); aircraft from its real equipment records; flight numbers, times and fares are rule-generated reference values, not live. Verify on airline sites before booking.',
     mapLoad:'Building map', rotOn:'Spinning', rotOff:'Paused', reset:'Reset',
     hint:'Drag to spin · scroll to zoom · hover / click a destination', noWebgl:'WebGL is not available in this browser',
@@ -787,9 +786,9 @@ function flightsFor(o,d){
       var dep=330+(h2%1080); dep=Math.round(dep/5)*5;
       var arr=dep+durMin+ (B.tz-A.tz)*60;
       var ac=eqList.length?acName(eqList[h2%eqList.length]):acByDist(al,dist);
-      var price=(35+dist*0.075)*(alLCC(al)?0.62:1)*(dist>4500?1.15:1);
+      var price=(35+dist*0.075)*(alLCC(al)?0.62:1)*(dist>4500?1.15:1)*7.2;  /* USD-scale -> RMB */
       price=price*(1+(((h2>>4)%37)-18)/100);
-      price=Math.max(40,Math.round(price/5)*5);
+      price=Math.max(280,Math.round(price/10)*10);
       out.push({
         al:al, no:al+" "+(base+i*(2+(h2%6))), ac:ac,
         dep:dep, arr:arr, plus:(arr>=1440?1:(arr<0?-1:0)),
@@ -964,7 +963,7 @@ function initGlobe(){
       if(typeof topojson==='undefined'){ return setTimeout(go,60); }
       var j=function(u){ return fetch(u).then(function(r){return r.json();}); };
       Promise.all([
-        j('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
+        j('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json'),
         j('https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json')
       ]).then(function(res){
         var bT=res[0], lT=res[1];
@@ -1005,15 +1004,15 @@ function initGlobe(){
           for(var h=0;h<p.holes.length;h++){if(inRing(lon,lat,p.holes[h])){hole=true;break;}}
           if(!hole)return true;}}
       return false;}
-    var pts=[],lats=[];for(var L=-84;L<=84;L+=1.9)lats.push(L);
+    var pts=[],lats=[];for(var L=-84;L<=84;L+=1.25)lats.push(L);
     var li=0;
     (function chunk(){
       var end=Math.min(li+8,lats.length);
-      for(;li<end;li++){var lat=lats[li],c=Math.cos(lat*Math.PI/180),st=1.9/Math.max(0.16,c);
+      for(;li<end;li++){var lat=lats[li],c=Math.cos(lat*Math.PI/180),st=1.25/Math.max(0.16,c);
         for(var lon=-180;lon<180;lon+=st){if(isLand(lon,lat)){var v=latLon(lat,lon,R*1.004);pts.push(v.x,v.y,v.z);}}}
       if(li<lats.length){setTimeout(chunk,0);return;}
       var g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pts),3));
-      globe.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x2ea6c4,size:1.5,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false})));
+      globe.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x33b0d0,size:1.05,transparent:true,opacity:0.62,blending:THREE.AdditiveBlending,depthWrite:false})));
     })();
   }
 
@@ -1064,8 +1063,8 @@ function initGlobe(){
     /* origin marker: dot + expanding radar rings */
     var oPos=latLon(o.lat,o.lon,R*1.006);
     originGrp=new THREE.Group(); originGrp.position.copy(oPos);
-    var og=new THREE.Sprite(new THREE.SpriteMaterial({map:GLOW,color:0xffb454,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:1}));
-    og.scale.setScalar(11); originGrp.add(og);
+    var og=new THREE.Sprite(new THREE.SpriteMaterial({map:GLOW,color:0xffb454,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.62}));
+    og.scale.setScalar(7); originGrp.add(og);
     originGrp.add(new THREE.Mesh(new THREE.SphereGeometry(1.5,12,12),new THREE.MeshBasicMaterial({color:0xffffff})));
     var olt=labelTex(o.code+" · "+cityName(o));
     var olab=new THREE.Sprite(new THREE.SpriteMaterial({map:olt,transparent:true,depthWrite:false,opacity:.95}));
@@ -1088,14 +1087,14 @@ function initGlobe(){
       var sel=!!state.dest;
       var col=sel?0xffb454:0x3fd6ff;
       var grp=new THREE.Group();
-      var halo=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,1.35,6,false),
-        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.09,blending:THREE.AdditiveBlending,depthWrite:false}));
-      var core=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,0.42,6,false),
-        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.62,blending:THREE.AdditiveBlending,depthWrite:false}));
+      var halo=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,0.95,6,false),
+        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.045,blending:THREE.AdditiveBlending,depthWrite:false}));
+      var core=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,0.32,6,false),
+        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.38,blending:THREE.AdditiveBlending,depthWrite:false}));
       grp.add(halo);grp.add(core);net.add(grp);
       var idxPerSeg=6*6; /* radialSegments(6) * 6 indices */
       var arc={grp:grp,halo:halo,core:core,curve:curve,seg:seg,idxPerSeg:idxPerSeg,dest:d.code,
-               born:now+(state.reduced?0:Math.min(i,90)*22),drawn:state.reduced?1:0,baseCore:.62,baseHalo:.09};
+               born:now+(state.reduced?0:Math.min(i,90)*22),drawn:state.reduced?1:0,baseCore:.38,baseHalo:.045};
       if(!state.reduced){ halo.geometry.setDrawRange(0,0); core.geometry.setDrawRange(0,0); }
       arcs.push(arc);
 
@@ -1182,7 +1181,7 @@ function initGlobe(){
     var B=AIRPORTS[m.code], d=m.data;
     var html='<div class="tp-code">'+m.code+'</div><div class="tp-city">'+cityName(B)+'</div>'+
       '<div class="tp-sub">'+d.dist.toLocaleString()+' km · '+d.flights.length+' '+T('flightsDay')+'</div>'+
-      '<div class="tp-sub" style="color:var(--amber)">'+T('tipFrom')+' $'+d.minPrice+'</div>'+
+      '<div class="tp-sub" style="color:var(--amber)">'+T('tipFrom')+' ¥'+d.minPrice+'</div>'+
       (state.dest?'':'<div class="tp-cta">'+T('tipCta')+'</div>');
     tipEl.innerHTML=html;tipEl.classList.add('on');
     var tx=m.sx+16,ty=m.sy-12;
@@ -1243,9 +1242,9 @@ function initGlobe(){
       m.sx=(v.x*0.5+0.5)*Wc;m.sy=(-v.y*0.5+0.5)*Hc;
       var vis=now>m.born;
       var hov2=(state.hoveredDest===m2);
-      var gt=vis?(state.hoveredDest>=0?(hov2?1.2:0.15):(0.45+0.5*Math.max(0,m.facing))):0;
+      var gt=vis?(state.hoveredDest>=0?(hov2?0.95:0.12):(0.28+0.34*Math.max(0,m.facing))):0;
       m.glow.material.opacity+=(gt-m.glow.material.opacity)*0.14;
-      m.glow.scale.setScalar(7.5+(hov2?4:0));
+      m.glow.scale.setScalar(5.2+(hov2?3.2:0));
       if(m.lab){
         var lt2=vis&&m.facing>0.3?(state.hoveredDest>=0?(hov2?1:0.1):(markers.length<=28?0.85:0)):0;
         if(markers.length>28&&hov2)lt2=1;
@@ -1505,7 +1504,7 @@ function initUI(){
             '<div class="fc-time">'+fmtTime(f.arr)+(f.plus>0?'<span class="plus1">+1</span>':'')+'<small>'+state.dest+'</small></div>'+
           '</div>'+
           '<div class="fc-bottom"><span class="fc-days">'+T('daily')+'</span>'+
-          '<span class="fc-price">$'+f.price+'<small>'+T('priceRef')+'</small></span></div></div>';
+          '<span class="fc-price">¥'+f.price+'<small>'+T('priceRef')+'</small></span></div></div>';
       });
       el.innerHTML=html;
       return;
@@ -1531,7 +1530,7 @@ function initUI(){
         '<div class="dest-code">'+d.code+'<small>'+(B.cc||'')+'</small></div>'+
         '<div class="dest-mid"><div class="dest-city">'+cityName(B)+'</div>'+
         '<div class="dest-meta">'+d.dist.toLocaleString()+' km · '+d.flights.length+' '+T('flightsDay')+' · '+d.carriers.length+' '+T('carriersN')+'</div></div>'+
-        '<div class="dest-right"><div class="dest-price">$'+d.minPrice+'<small>'+T('priceRef')+'</small></div>'+
+        '<div class="dest-right"><div class="dest-price">¥'+d.minPrice+'<small>'+T('priceRef')+'</small></div>'+
         '<div class="carrier-dots">'+dots+'</div></div></div>';
     });
     el.innerHTML=html;
