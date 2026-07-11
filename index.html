@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FlightScope · 直飞航线探索</title>
+<meta name="description" content="交互式 3D 地球直飞航线查询工具：输入出发机场，可视化全球直飞目的地与参考航班信息（示例数据）。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%233fd6ff' d='M21.5 15.5v-2l-8.5-5V3a1.5 1.5 0 0 0-3 0v5.5l-8.5 5v2l8.5-2.5v5l-2.5 2v1.5l4-1 4 1V20l-2.5-2v-5z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#04070f; --bg-1:#0a1120;
+    --glass:rgba(12,20,40,.66); --glass-2:rgba(16,27,54,.55); --glass-hi:rgba(30,48,92,.55);
+    --line:rgba(122,168,255,.14); --line-2:rgba(122,198,255,.32);
+    --cyan:#3fd6ff; --cyan-soft:rgba(63,214,255,.14); --amber:#ffb454; --amber-soft:rgba(255,180,84,.14);
+    --t1:#e8f1ff; --t2:#9db1d6; --t3:#64789e;
+    --ok:#3ddc97; --danger:#ff7a7a;
+    --r-lg:16px; --r-md:12px; --r-sm:9px;
+    --font-disp:'Space Grotesk',-apple-system,'Segoe UI',sans-serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+    --ease:cubic-bezier(.22,.8,.28,1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg-0);color:var(--t1);font-family:var(--font-body);overflow:hidden}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:4px}
+
+  #app{display:flex;width:100%;height:100vh;height:100dvh}
+
+  /* ---------------- left panel ---------------- */
+  .panel{
+    width:392px;min-width:392px;height:100%;display:flex;flex-direction:column;z-index:5;
+    background:linear-gradient(180deg,rgba(10,17,34,.92),rgba(6,10,22,.94));
+    border-right:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  }
+  .brand{display:flex;align-items:center;gap:11px;padding:20px 20px 14px}
+  .brand-logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;
+    background:linear-gradient(135deg,rgba(63,214,255,.18),rgba(63,214,255,.04));border:1px solid var(--line-2)}
+  .brand-logo svg{width:21px;height:21px;fill:var(--cyan)}
+  .brand h1{font:600 17px/1.2 var(--font-disp);margin:0;letter-spacing:.02em}
+  .brand p{margin:2px 0 0;font-size:11px;color:var(--t3);letter-spacing:.14em;text-transform:uppercase}
+  .demo-chip{margin-left:auto;flex:none;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--amber);
+    background:var(--amber-soft);border:1px solid rgba(255,180,84,.3);padding:4px 8px;border-radius:99px;white-space:nowrap}
+
+  .search-zone{padding:4px 20px 0;position:relative}
+  .field{position:relative;margin-bottom:10px}
+  .field label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--t3);text-transform:uppercase;margin:0 0 6px 2px}
+  .field label .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .input-wrap{position:relative;display:flex;align-items:center}
+  .input-wrap svg.lead{position:absolute;left:12px;width:15px;height:15px;fill:none;stroke:var(--t3);stroke-width:1.8;pointer-events:none}
+  .input-wrap input{
+    width:100%;height:46px;padding:0 40px 0 36px;border-radius:var(--r-md);color:var(--t1);
+    background:var(--glass-2);border:1px solid var(--line);font:500 14px var(--font-body);
+    transition:border-color .18s,box-shadow .18s;
+  }
+  .input-wrap input::placeholder{color:var(--t3)}
+  .input-wrap input:focus{outline:none;border-color:var(--line-2);box-shadow:0 0 0 3px rgba(63,214,255,.12)}
+  .clear-btn{position:absolute;right:6px;width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--t3);
+    display:none;place-items:center;cursor:pointer}
+  .clear-btn:hover{background:var(--glass-hi);color:var(--t1)}
+  .clear-btn svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none}
+  .input-wrap.has-value .clear-btn{display:grid}
+  .swap-row{display:flex;justify-content:center;margin:-4px 0 6px}
+  .swap-btn{width:34px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--glass-2);color:var(--t2);
+    display:grid;place-items:center;cursor:pointer;transition:.18s}
+  .swap-btn:hover{color:var(--cyan);border-color:var(--line-2);transform:scale(1.06)}
+  .swap-btn svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;fill:none}
+
+  .ac-list{position:absolute;left:20px;right:20px;z-index:30;margin-top:4px;max-height:284px;overflow:auto;
+    background:rgba(9,15,31,.97);border:1px solid var(--line-2);border-radius:var(--r-md);
+    box-shadow:0 18px 50px rgba(0,0,0,.6);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  .ac-item{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(122,168,255,.06)}
+  .ac-item:last-child{border-bottom:0}
+  .ac-item.active,.ac-item:hover{background:var(--cyan-soft)}
+  .ac-code{font:600 13px var(--font-mono);color:var(--cyan);width:44px;flex:none}
+  .ac-name{font-size:13px;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ac-sub{margin-left:auto;font-size:11px;color:var(--t3);flex:none}
+
+  .chips{display:flex;flex-wrap:wrap;gap:7px;padding:2px 20px 12px}
+  .chips span{font-size:10.5px;color:var(--t3);width:100%;letter-spacing:.08em;text-transform:uppercase;margin-bottom:-1px}
+  .chip{border:1px solid var(--line);background:var(--glass-2);color:var(--t2);border-radius:99px;
+    font:500 12px var(--font-mono);padding:6px 12px;cursor:pointer;transition:.16s}
+  .chip:hover{color:var(--cyan);border-color:var(--line-2);background:var(--cyan-soft)}
+
+  .stats{display:flex;align-items:baseline;gap:16px;padding:10px 20px;border-top:1px solid var(--line)}
+  .stat b{font:600 22px var(--font-disp);color:var(--t1);font-variant-numeric:tabular-nums}
+  .stat small{display:block;font-size:10.5px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-top:1px}
+  .stat.accent b{color:var(--cyan)}
+  .partial-note{padding:0 20px 8px;font-size:11px;color:var(--amber);display:none}
+
+  .sort-row{display:flex;gap:6px;padding:0 20px 10px}
+  .sort-btn{border:1px solid var(--line);background:transparent;color:var(--t3);font-size:11.5px;font-weight:500;
+    border-radius:8px;padding:5px 10px;cursor:pointer;transition:.15s}
+  .sort-btn.on{color:var(--cyan);border-color:var(--line-2);background:var(--cyan-soft)}
+  .filter-row{display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 10px;align-items:center}
+  .filter-row .fl-label{font-size:10px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;margin-right:2px}
+  .fchip{border:1px solid var(--line);background:transparent;color:var(--t2);font-size:11.5px;font-weight:500;
+    border-radius:99px;padding:4.5px 11px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .fchip:hover{color:var(--cyan);border-color:var(--line-2)}
+  .fchip.on{color:#04070f;background:var(--cyan);border-color:var(--cyan);font-weight:600}
+  .fchip.amber.on{background:var(--amber);border-color:var(--amber)}
+  .filter-row select{background:var(--glass-2);color:var(--t1);border:1px solid var(--line);border-radius:8px;
+    font:500 11.5px var(--font-body);padding:5px 8px;cursor:pointer;max-width:150px}
+
+  #list{flex:1;overflow-y:auto;padding:2px 14px 10px;scrollbar-width:thin;scrollbar-color:rgba(122,168,255,.25) transparent}
+  #list::-webkit-scrollbar{width:8px}
+  #list::-webkit-scrollbar-thumb{background:rgba(122,168,255,.18);border-radius:4px}
+
+  .empty-state{margin:26px 14px;text-align:center;color:var(--t3);font-size:13px;line-height:1.7}
+  .empty-state svg{width:38px;height:38px;stroke:var(--t3);fill:none;stroke-width:1.4;margin-bottom:8px;opacity:.7}
+
+  /* destination card */
+  .dest-card{display:flex;align-items:center;gap:12px;margin:6px 6px;padding:11px 12px;border-radius:var(--r-md);
+    background:var(--glass-2);border:1px solid var(--line);cursor:pointer;transition:border-color .16s,background .16s,transform .16s;
+    animation:cardIn .34s var(--ease) both}
+  .dest-card:hover,.dest-card.hi{border-color:var(--line-2);background:var(--glass-hi);transform:translateX(2px)}
+  @keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .dest-code{font:600 15px var(--font-mono);color:var(--cyan);width:52px;flex:none}
+  .dest-code small{display:block;font:400 9.5px var(--font-mono);color:var(--t3);letter-spacing:.04em}
+  .dest-mid{min-width:0;flex:1}
+  .dest-city{font:600 14px var(--font-disp);color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dest-meta{font-size:11px;color:var(--t3);margin-top:2px;font-variant-numeric:tabular-nums}
+  .dest-right{text-align:right;flex:none}
+  .dest-price{font:600 14px var(--font-mono);color:var(--amber)}
+  .dest-price small{font-size:9px;color:var(--t3);display:block;letter-spacing:.05em}
+  .carrier-dots{display:flex;gap:3px;justify-content:flex-end;margin-top:4px}
+  .carrier-dots i{width:14px;height:14px;border-radius:50%;font:600 7.5px/14px var(--font-mono);text-align:center;color:#04070f;font-style:normal}
+
+  /* flight card */
+  .flight-card{margin:6px 6px;padding:12px 13px;border-radius:var(--r-md);background:var(--glass-2);
+    border:1px solid var(--line);animation:cardIn .34s var(--ease) both}
+  .flight-card:hover{border-color:var(--line-2)}
+  .fc-top{display:flex;align-items:center;gap:9px}
+  .al-logo{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;
+    font:600 9.5px var(--font-mono);color:#04070f}
+  .fc-airline{font-size:12.5px;font-weight:600;color:var(--t1);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fc-no{font:600 12px var(--font-mono);color:var(--cyan)}
+  .fc-ac{margin-left:auto;font:500 10.5px var(--font-mono);color:var(--t2);background:var(--glass-hi);
+    border:1px solid var(--line);padding:2.5px 7px;border-radius:6px;flex:none}
+  .fc-route{display:flex;align-items:center;gap:10px;margin-top:11px}
+  .fc-time{font:600 17px var(--font-mono);color:var(--t1);font-variant-numeric:tabular-nums}
+  .fc-time small{display:block;font:400 10px var(--font-mono);color:var(--t3);margin-top:1px;letter-spacing:.04em}
+  .fc-time .plus1{color:var(--amber);font-size:10px;vertical-align:super}
+  .fc-line{flex:1;position:relative;height:16px;min-width:40px}
+  .fc-line::before{content:"";position:absolute;left:0;right:0;top:8px;border-top:1px dashed rgba(122,168,255,.35)}
+  .fc-line svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(90deg);width:13px;height:13px;fill:var(--t2)}
+  .fc-dur{position:absolute;left:50%;transform:translateX(-50%);top:-9px;font:500 9.5px var(--font-mono);color:var(--t3);white-space:nowrap}
+  .fc-bottom{display:flex;align-items:center;margin-top:10px;padding-top:9px;border-top:1px solid rgba(122,168,255,.08)}
+  .fc-days{font:500 10px var(--font-mono);color:var(--t3);letter-spacing:.06em}
+  .fc-price{margin-left:auto;font:600 16px var(--font-mono);color:var(--amber)}
+  .fc-price small{font-size:9.5px;color:var(--t3);margin-left:3px}
+
+  .route-head{display:flex;align-items:center;gap:9px;margin:10px 6px 4px;padding:11px 13px;border-radius:var(--r-md);
+    background:linear-gradient(120deg,rgba(63,214,255,.1),rgba(255,180,84,.07));border:1px solid var(--line-2)}
+  .route-head .rh-codes{font:600 15px var(--font-mono);color:var(--t1);letter-spacing:.02em}
+  .route-head .rh-codes svg{width:13px;height:13px;fill:var(--cyan);vertical-align:-1px;margin:0 4px}
+  .route-head .rh-sub{margin-left:auto;font-size:11px;color:var(--t2);text-align:right}
+
+  .panel-foot{padding:10px 20px 14px;border-top:1px solid var(--line);font-size:10.5px;line-height:1.6;color:var(--t3)}
+  .panel-foot b{color:var(--amber);font-weight:600}
+
+  /* ---------------- globe stage ---------------- */
+  .stage{position:relative;flex:1;min-width:0;height:100%;
+    background:radial-gradient(115% 90% at 55% 40%,#0c162e 0%,#060b1a 50%,#03040a 100%)}
+  #holder{position:absolute;inset:0}
+  #holder canvas{display:block;touch-action:none;cursor:grab}
+  #holder canvas:active{cursor:grabbing}
+  .stage-controls{position:absolute;right:16px;top:16px;z-index:6;display:flex;gap:8px}
+  .g-btn{height:34px;min-width:34px;padding:0 11px;border-radius:9px;border:1px solid var(--line);
+    background:rgba(14,23,46,.62);color:#cfe0ff;font:600 11.5px var(--font-body);letter-spacing:.02em;
+    cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:.16s;display:inline-flex;align-items:center;gap:6px}
+  .g-btn:hover{border-color:var(--line-2);background:rgba(30,48,92,.7);color:#fff}
+  .g-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
+  .stage-hint{position:absolute;right:18px;bottom:14px;z-index:6;font-size:11px;color:var(--t3);letter-spacing:.04em;pointer-events:none}
+  .map-load{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;pointer-events:none;
+    font:500 10.5px var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:#7f96c2;transition:opacity .4s}
+  .map-load::before{content:"";display:inline-block;width:7px;height:7px;margin-right:9px;border-radius:50%;
+    background:var(--cyan);box-shadow:0 0 10px var(--cyan);animation:pulse 1.1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+  .g-tip{position:absolute;z-index:7;pointer-events:none;min-width:150px;max-width:240px;padding:11px 13px;border-radius:11px;
+    opacity:0;transform:translateY(6px);transition:opacity .14s,transform .14s;
+    background:rgba(9,15,31,.9);border:1px solid var(--line-2);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    box-shadow:0 12px 40px rgba(0,0,0,.55)}
+  .g-tip.on{opacity:1;transform:none}
+  .g-tip .tp-code{font:600 12px var(--font-mono);color:var(--cyan)}
+  .g-tip .tp-city{font:600 14px var(--font-disp);color:#fff;margin:2px 0 1px}
+  .g-tip .tp-sub{font-size:11px;color:var(--t2);font-variant-numeric:tabular-nums}
+  .g-tip .tp-cta{font-size:10px;color:var(--amber);margin-top:7px;letter-spacing:.03em}
+
+  .fallback{position:absolute;inset:0;display:none;place-items:center;color:var(--t3);font-size:13px;z-index:8}
+
+  @media (max-width:880px){
+    #app{flex-direction:column}
+    .stage{order:1;height:46%;flex:none}
+    .panel{order:2;width:100%;min-width:0;flex:1;border-right:0;border-top:1px solid var(--line)}
+    .brand{padding:12px 16px 8px}
+    .search-zone{padding:0 16px}
+    .ac-list{left:16px;right:16px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .dest-card,.flight-card{animation:none}
+    *{transition-duration:.01ms!important}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ================= left panel ================= -->
+  <aside class="panel">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M21.5 15.5v-2l-8.5-5V3a1.5 1.5 0 0 0-3 0v5.5l-8.5 5v2l8.5-2.5v5l-2.5 2v1.5l4-1 4 1V20l-2.5-2v-5z"/></svg>
+      </div>
+      <div>
+        <h1>FlightScope</h1>
+        <p data-i18n="tagline">直飞航线探索</p>
+      </div>
+      <span class="demo-chip" data-i18n="demoChip">示例数据</span>
+    </div>
+
+    <div class="search-zone">
+      <div class="field">
+        <label for="inp-o"><span class="dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span><span data-i18n="from">出发地</span></label>
+        <div class="input-wrap" id="wrap-o">
+          <svg class="lead" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="inp-o" type="text" autocomplete="off" spellcheck="false" data-i18n-ph="phFrom" placeholder="城市 / 机场代码，如 马尼拉 或 MNL" aria-label="出发地">
+          <button class="clear-btn" id="clr-o" aria-label="清除出发地" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>
+      </div>
+      <div class="swap-row">
+        <button class="swap-btn" id="btn-swap" aria-label="交换起点与终点" title="交换">
+          <svg viewBox="0 0 24 24"><path d="M7 4v13m0 3-3.5-3.5M7 20l3.5-3.5M17 20V7m0-3 3.5 3.5M17 4l-3.5 3.5"/></svg>
+        </button>
+      </div>
+      <div class="field">
+        <label for="inp-d"><span class="dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber)"></span><span data-i18n="to">目的地（可选）</span></label>
+        <div class="input-wrap" id="wrap-d">
+          <svg class="lead" viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+          <input id="inp-d" type="text" autocomplete="off" spellcheck="false" data-i18n-ph="phTo" placeholder="留空 = 查看全部直飞目的地" aria-label="目的地">
+          <button class="clear-btn" id="clr-d" aria-label="清除目的地" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>
+      </div>
+      <div class="ac-list" id="ac" role="listbox" style="display:none"></div>
+    </div>
+
+    <div class="chips" id="chips">
+      <span data-i18n="hot">热门出发地</span>
+    </div>
+
+    <div class="stats" aria-live="polite">
+      <div class="stat accent"><b id="st-dest">—</b><small data-i18n="stDest">直飞目的地</small></div>
+      <div class="stat"><b id="st-flt">—</b><small data-i18n="stFlt">参考航班/日</small></div>
+      <div class="stat"><b id="st-al">—</b><small data-i18n="stAl">承运航司</small></div>
+    </div>
+    <div class="partial-note" id="partial-note" data-i18n="partialNote">该机场仅收录与菲律宾 / 中国相关的航线</div>
+
+    <div class="sort-row" id="sort-row" style="display:none">
+      <button class="sort-btn on" data-sort="dist" data-i18n="sortDist">按距离</button>
+      <button class="sort-btn" data-sort="price" data-i18n="sortPrice">按价格</button>
+      <button class="sort-btn" data-sort="flights" data-i18n="sortFlt">按航班数</button>
+    </div>
+    <div class="filter-row" id="region-row" style="display:none"></div>
+    <div class="filter-row" id="flt-filter" style="display:none"></div>
+
+    <div id="list" role="list">
+      <div class="empty-state" id="empty-init">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3a17 17 0 0 1 0 18M12 3a17 17 0 0 0 0 18"/></svg>
+        <div data-i18n="emptyInit">输入出发机场，探索全球直飞航线<br>或点击上方热门出发地快速开始</div>
+      </div>
+    </div>
+
+    <div class="panel-foot">
+      <b data-i18n="dscTitle">示例数据说明</b> · <span data-i18n="dscBody">航线 / 航司 / 机型基于公开资料整理（2026-01 前），航班号、时刻与票价为规则生成的参考值，非实时数据，预订前请以航司官网为准。</span>
+    </div>
+  </aside>
+
+  <!-- ================= globe ================= -->
+  <main class="stage">
+    <h2 class="sr-only" data-i18n="srGlobe">交互式 3D 地球：显示所选出发机场的直飞航线网络，拖拽旋转，滚轮缩放，悬停查看目的地，点击目的地查看航班。</h2>
+    <div id="holder"></div>
+    <div class="stage-controls">
+      <button class="g-btn" id="btn-lang" aria-label="Switch language">EN</button>
+      <button class="g-btn" id="btn-rot" aria-pressed="true">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg><span data-i18n="rotOn">旋转中</span>
+      </button>
+      <button class="g-btn" id="btn-reset">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg><span data-i18n="reset">重置</span>
+      </button>
+    </div>
+    <div class="map-load" id="map-load" data-i18n="mapLoad">正在构建地图</div>
+    <div class="g-tip" id="tip"></div>
+    <div class="stage-hint" data-i18n="hint">拖拽旋转 · 滚轮缩放 · 悬停/点击目的地</div>
+    <div class="fallback" id="fallback" data-i18n="noWebgl">此浏览器不支持 WebGL</div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="flight-data.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   FlightScope — 直飞航线探索 (示例数据 / demo dataset)
+   ===================================================================== */
+
+/* ---------------- i18n ---------------- */
+var I18N = {
+  zh:{
+    tagline:'直飞航线探索', demoChip:'示例数据', from:'出发地', to:'目的地（可选）',
+    phFrom:'城市 / 机场代码，如 马尼拉 或 MNL', phTo:'留空 = 查看全部直飞目的地',
+    hot:'热门出发地', stDest:'直飞目的地', stFlt:'参考航班/日', stAl:'承运航司',
+    sortDist:'按距离', sortPrice:'按价格', sortFlt:'按航班数',
+    emptyInit:'输入出发机场，探索全球直飞航线<br>或点击上方热门出发地快速开始',
+    emptyNoRoute:'暂无该航线的直飞记录<br>可尝试更换目的地，或查看出发地的全部直飞网络',
+    emptyNeedOrigin:'请先选择出发地',
+    dscTitle:'示例数据说明',
+    dscBody:'航线拓扑来自 OpenFlights 开放数据集（历史存量，约 2014 年，部分航线已变动）；机型取自该数据集的真实执飞机型记录；航班号、时刻、票价为规则生成的参考值，非实时。预订前请以航司官网为准。',
+    mapLoad:'正在构建地图', rotOn:'旋转中', rotOff:'已暂停', reset:'重置',
+    hint:'拖拽旋转 · 滚轮缩放 · 悬停/点击目的地', noWebgl:'此浏览器不支持 WebGL',
+    srGlobe:'交互式 3D 地球：显示所选出发机场的直飞航线网络。',
+    partialNote:'',
+    tipCta:'点击设为目的地 →', tipFrom:'直飞参考价', flightsDay:'班/日(参考)', carriersN:'家航司',
+    dur_h:'小时', dur_m:'分', priceRef:'参考', daily:'每日 (参考)', km:'公里',
+    routeFlights:'班直飞(参考)',
+    regAll:'全部', regEA:'东亚', regSEA:'东南亚', regSASIA:'南亚·中东', regEU:'欧洲', regNA:'北美', regOC:'大洋洲', regAF:'非洲', regSAM:'中南美',
+    ffTime:'时段', ffAll:'全部', ffMorning:'上午', ffAfternoon:'下午', ffEvening:'晚上', ffNight:'凌晨', ffAirline:'航司', ffNoMatch:'当前筛选无匹配航班', clearFilter:'清除筛选'
+  },
+  en:{
+    tagline:'Direct Route Explorer', demoChip:'DEMO DATA', from:'From', to:'To (optional)',
+    phFrom:'City / airport code, e.g. Manila or MNL', phTo:'Leave empty to see all nonstop destinations',
+    hot:'Popular origins', stDest:'Nonstop destinations', stFlt:'Ref. flights/day', stAl:'Carriers',
+    sortDist:'Distance', sortPrice:'Price', sortFlt:'Flights',
+    emptyInit:'Enter a departure airport to explore nonstop routes<br>or tap a popular origin above',
+    emptyNoRoute:'No nonstop service found on this route<br>Try another destination, or browse all nonstop routes',
+    emptyNeedOrigin:'Please select a departure airport first',
+    dscTitle:'About this demo data',
+    dscBody:'Route topology from the OpenFlights open dataset (historical, ~2014; some routes have since changed); aircraft from its real equipment records; flight numbers, times and fares are rule-generated reference values, not live. Verify on airline sites before booking.',
+    mapLoad:'Building map', rotOn:'Spinning', rotOff:'Paused', reset:'Reset',
+    hint:'Drag to spin · scroll to zoom · hover / click a destination', noWebgl:'WebGL is not available in this browser',
+    srGlobe:'Interactive 3D globe showing nonstop route network of the selected origin airport.',
+    partialNote:'Only routes to/from the Philippines & China are included for this airport',
+    tipCta:'Click to set as destination →', tipFrom:'Nonstop from', flightsDay:'flights/day (ref.)', carriersN:'carriers',
+    dur_h:'h', dur_m:'m', priceRef:'ref.', daily:'Daily (ref.)', km:'km',
+    routeFlights:'nonstop flights (ref.)',
+    regAll:'All', regEA:'East Asia', regSEA:'SE Asia', regSASIA:'S.Asia·M.East', regEU:'Europe', regNA:'N.America', regOC:'Oceania', regAF:'Africa', regSAM:'S.America',
+    ffTime:'Time', ffAll:'All', ffMorning:'Morning', ffAfternoon:'Afternoon', ffEvening:'Evening', ffNight:'Late', ffAirline:'Airline', ffNoMatch:'No flights match the filter', clearFilter:'Clear filter'
+  }
+};
+var LANG='zh';
+function T(k){ return (I18N[LANG][k]!=null?I18N[LANG][k]:k); }
+
+/* ---------------- airports ----------------
+   [code, nameEn, nameZh, cityEn, cityZh, country, lat, lon, tzOffsetHours] */
+var AIRPORT_ROWS = [
+  /* Philippines */
+  ["MNL","Ninoy Aquino Intl","尼诺伊·阿基诺国际机场","Manila","马尼拉","PH",14.5086,121.0198,8],
+  ["CEB","Mactan–Cebu Intl","麦克坦-宿务国际机场","Cebu","宿务","PH",10.3075,123.9789,8],
+  ["CRK","Clark Intl","克拉克国际机场","Clark / Angeles","克拉克","PH",15.1860,120.5600,8],
+  ["DVO","Francisco Bangoy Intl","达沃国际机场","Davao","达沃","PH",7.1254,125.6456,8],
+  ["KLO","Kalibo Intl","卡利博国际机场","Kalibo (Boracay)","卡利博(长滩岛)","PH",11.6794,122.3766,8],
+  ["ILO","Iloilo Intl","伊洛伊洛国际机场","Iloilo","伊洛伊洛","PH",10.8330,122.4930,8],
+  ["PPS","Puerto Princesa Intl","公主港国际机场","Puerto Princesa","公主港(巴拉望)","PH",9.7422,118.7590,8],
+  ["TAG","Bohol–Panglao Intl","薄荷-邦劳国际机场","Panglao (Bohol)","邦劳(薄荷岛)","PH",9.5708,123.7710,8],
+  ["LAO","Laoag Intl","佬沃国际机场","Laoag","佬沃","PH",18.1781,120.5316,8],
+  /* China */
+  ["PEK","Beijing Capital Intl","北京首都国际机场","Beijing","北京","CN",40.0799,116.6031,8],
+  ["PKX","Beijing Daxing Intl","北京大兴国际机场","Beijing","北京","CN",39.5098,116.4105,8],
+  ["PVG","Shanghai Pudong Intl","上海浦东国际机场","Shanghai","上海","CN",31.1443,121.8083,8],
+  ["SHA","Shanghai Hongqiao Intl","上海虹桥国际机场","Shanghai","上海","CN",31.1979,121.3363,8],
+  ["CAN","Guangzhou Baiyun Intl","广州白云国际机场","Guangzhou","广州","CN",23.3924,113.2988,8],
+  ["SZX","Shenzhen Bao'an Intl","深圳宝安国际机场","Shenzhen","深圳","CN",22.6393,113.8108,8],
+  ["CTU","Chengdu Shuangliu Intl","成都双流国际机场","Chengdu","成都","CN",30.5785,103.9471,8],
+  ["TFU","Chengdu Tianfu Intl","成都天府国际机场","Chengdu","成都","CN",30.3125,104.4415,8],
+  ["CKG","Chongqing Jiangbei Intl","重庆江北国际机场","Chongqing","重庆","CN",29.7192,106.6417,8],
+  ["KMG","Kunming Changshui Intl","昆明长水国际机场","Kunming","昆明","CN",25.1019,102.9292,8],
+  ["XIY","Xi'an Xianyang Intl","西安咸阳国际机场","Xi'an","西安","CN",34.4471,108.7516,8],
+  ["HGH","Hangzhou Xiaoshan Intl","杭州萧山国际机场","Hangzhou","杭州","CN",30.2295,120.4344,8],
+  ["NKG","Nanjing Lukou Intl","南京禄口国际机场","Nanjing","南京","CN",31.7418,118.8620,8],
+  ["WUH","Wuhan Tianhe Intl","武汉天河国际机场","Wuhan","武汉","CN",30.7838,114.2081,8],
+  ["CSX","Changsha Huanghua Intl","长沙黄花国际机场","Changsha","长沙","CN",28.1892,113.2200,8],
+  ["XMN","Xiamen Gaoqi Intl","厦门高崎国际机场","Xiamen","厦门","CN",24.5440,118.1277,8],
+  ["FOC","Fuzhou Changle Intl","福州长乐国际机场","Fuzhou","福州","CN",25.9351,119.6633,8],
+  ["TAO","Qingdao Jiaodong Intl","青岛胶东国际机场","Qingdao","青岛","CN",36.3623,120.0881,8],
+  ["TSN","Tianjin Binhai Intl","天津滨海国际机场","Tianjin","天津","CN",39.1244,117.3462,8],
+  ["DLC","Dalian Zhoushuizi Intl","大连周水子国际机场","Dalian","大连","CN",38.9657,121.5386,8],
+  ["SHE","Shenyang Taoxian Intl","沈阳桃仙国际机场","Shenyang","沈阳","CN",41.6398,123.4830,8],
+  ["HRB","Harbin Taiping Intl","哈尔滨太平国际机场","Harbin","哈尔滨","CN",45.6234,126.2503,8],
+  ["URC","Ürümqi Tianshan Intl","乌鲁木齐天山国际机场","Ürümqi","乌鲁木齐","CN",43.9071,87.4742,8],
+  ["SYX","Sanya Phoenix Intl","三亚凤凰国际机场","Sanya","三亚","CN",18.3029,109.4122,8],
+  ["HAK","Haikou Meilan Intl","海口美兰国际机场","Haikou","海口","CN",19.9349,110.4590,8],
+  ["NNG","Nanning Wuxu Intl","南宁吴圩国际机场","Nanning","南宁","CN",22.6083,108.1725,8],
+  ["KWL","Guilin Liangjiang Intl","桂林两江国际机场","Guilin","桂林","CN",25.2181,110.0390,8],
+  ["CGO","Zhengzhou Xinzheng Intl","郑州新郑国际机场","Zhengzhou","郑州","CN",34.5197,113.8409,8],
+  ["WNZ","Wenzhou Longwan Intl","温州龙湾国际机场","Wenzhou","温州","CN",27.9122,120.8520,8],
+  ["JJN","Quanzhou Jinjiang Intl","泉州晋江国际机场","Quanzhou","泉州","CN",24.7964,118.5900,8],
+  /* East & Southeast Asia */
+  ["HKG","Hong Kong Intl","香港国际机场","Hong Kong","香港","HK",22.3080,113.9185,8],
+  ["MFM","Macau Intl","澳门国际机场","Macau","澳门","MO",22.1496,113.5920,8],
+  ["TPE","Taoyuan Intl","台湾桃园国际机场","Taipei","台北","TW",25.0777,121.2328,8],
+  ["NRT","Narita Intl","成田国际机场","Tokyo","东京","JP",35.7647,140.3864,9],
+  ["HND","Haneda Intl","羽田国际机场","Tokyo","东京","JP",35.5494,139.7798,9],
+  ["KIX","Kansai Intl","关西国际机场","Osaka","大阪","JP",34.4347,135.2441,9],
+  ["NGO","Chubu Centrair Intl","中部国际机场","Nagoya","名古屋","JP",34.8584,136.8048,9],
+  ["FUK","Fukuoka Intl","福冈机场","Fukuoka","福冈","JP",33.5859,130.4507,9],
+  ["CTS","New Chitose Intl","新千岁机场","Sapporo","札幌","JP",42.7752,141.6923,9],
+  ["ICN","Incheon Intl","仁川国际机场","Seoul","首尔","KR",37.4602,126.4407,9],
+  ["GMP","Gimpo Intl","金浦国际机场","Seoul","首尔","KR",37.5583,126.7906,9],
+  ["PUS","Gimhae Intl","金海国际机场","Busan","釜山","KR",35.1795,128.9382,9],
+  ["SIN","Changi Intl","樟宜国际机场","Singapore","新加坡","SG",1.3644,103.9915,8],
+  ["KUL","Kuala Lumpur Intl","吉隆坡国际机场","Kuala Lumpur","吉隆坡","MY",2.7456,101.7099,8],
+  ["BKK","Suvarnabhumi Intl","素万那普国际机场","Bangkok","曼谷","TH",13.6900,100.7501,7],
+  ["DMK","Don Mueang Intl","廊曼国际机场","Bangkok","曼谷","TH",13.9126,100.6067,7],
+  ["CNX","Chiang Mai Intl","清迈国际机场","Chiang Mai","清迈","TH",18.7668,98.9626,7],
+  ["HKT","Phuket Intl","普吉国际机场","Phuket","普吉","TH",8.1132,98.3169,7],
+  ["SGN","Tan Son Nhat Intl","新山一国际机场","Ho Chi Minh City","胡志明市","VN",10.8188,106.6520,7],
+  ["HAN","Noi Bai Intl","内排国际机场","Hanoi","河内","VN",21.2212,105.8070,7],
+  ["DAD","Da Nang Intl","岘港国际机场","Da Nang","岘港","VN",16.0439,108.1994,7],
+  ["PNH","Phnom Penh Intl","金边国际机场","Phnom Penh","金边","KH",11.5466,104.8441,7],
+  ["RGN","Yangon Intl","仰光国际机场","Yangon","仰光","MM",16.9073,96.1332,6.5],
+  ["VTE","Wattay Intl","瓦岱国际机场","Vientiane","万象","LA",17.9883,102.5633,7],
+  ["CGK","Soekarno–Hatta Intl","苏加诺-哈达国际机场","Jakarta","雅加达","ID",-6.1256,106.6559,7],
+  ["DPS","Ngurah Rai Intl","伍拉·赖国际机场","Bali (Denpasar)","巴厘岛","ID",-8.7482,115.1672,8],
+  ["BWN","Brunei Intl","文莱国际机场","Bandar Seri Begawan","斯里巴加湾","BN",4.9442,114.9281,8],
+  ["KTM","Tribhuvan Intl","特里布万国际机场","Kathmandu","加德满都","NP",27.6966,85.3591,5.75],
+  ["CMB","Bandaranaike Intl","班达拉奈克国际机场","Colombo","科伦坡","LK",7.1808,79.8841,5.5],
+  ["ALA","Almaty Intl","阿拉木图国际机场","Almaty","阿拉木图","KZ",43.3521,77.0405,6],
+  /* Middle East */
+  ["DXB","Dubai Intl","迪拜国际机场","Dubai","迪拜","AE",25.2532,55.3657,4],
+  ["AUH","Zayed Intl","扎耶德国际机场","Abu Dhabi","阿布扎比","AE",24.4330,54.6511,4],
+  ["DOH","Hamad Intl","哈马德国际机场","Doha","多哈","QA",25.2731,51.6081,3],
+  ["RUH","King Khalid Intl","哈立德国王国际机场","Riyadh","利雅得","SA",24.9576,46.6988,3],
+  ["JED","King Abdulaziz Intl","阿卜杜勒-阿齐兹国王机场","Jeddah","吉达","SA",21.6796,39.1565,3],
+  ["KWI","Kuwait Intl","科威特国际机场","Kuwait City","科威特城","KW",29.2266,47.9689,3],
+  ["BAH","Bahrain Intl","巴林国际机场","Manama","麦纳麦","BH",26.2708,50.6336,3],
+  ["MCT","Muscat Intl","马斯喀特国际机场","Muscat","马斯喀特","OM",23.5933,58.2844,4],
+  ["IST","Istanbul Airport","伊斯坦布尔机场","Istanbul","伊斯坦布尔","TR",41.2753,28.7519,3],
+  /* Europe */
+  ["LHR","Heathrow","希思罗机场","London","伦敦","GB",51.4700,-0.4543,1],
+  ["CDG","Charles de Gaulle","戴高乐机场","Paris","巴黎","FR",49.0097,2.5479,2],
+  ["FRA","Frankfurt Airport","法兰克福机场","Frankfurt","法兰克福","DE",50.0379,8.5622,2],
+  ["MUC","Munich Airport","慕尼黑机场","Munich","慕尼黑","DE",48.3538,11.7861,2],
+  ["AMS","Schiphol","史基浦机场","Amsterdam","阿姆斯特丹","NL",52.3105,4.7683,2],
+  ["SVO","Sheremetyevo Intl","谢列梅捷沃国际机场","Moscow","莫斯科","RU",55.9736,37.4125,3],
+  ["ZRH","Zurich Airport","苏黎世机场","Zurich","苏黎世","CH",47.4647,8.5492,2],
+  ["HEL","Helsinki-Vantaa","赫尔辛基-万塔机场","Helsinki","赫尔辛基","FI",60.3172,24.9633,3],
+  ["FCO","Fiumicino","菲乌米奇诺机场","Rome","罗马","IT",41.8003,12.2389,2],
+  /* North America & Pacific */
+  ["LAX","Los Angeles Intl","洛杉矶国际机场","Los Angeles","洛杉矶","US",33.9416,-118.4085,-7],
+  ["SFO","San Francisco Intl","旧金山国际机场","San Francisco","旧金山","US",37.6213,-122.3790,-7],
+  ["SEA","Seattle–Tacoma Intl","西雅图-塔科马国际机场","Seattle","西雅图","US",47.4502,-122.3088,-7],
+  ["JFK","John F. Kennedy Intl","肯尼迪国际机场","New York","纽约","US",40.6413,-73.7781,-4],
+  ["DTW","Detroit Metro","底特律都会机场","Detroit","底特律","US",42.2162,-83.3554,-4],
+  ["HNL","Daniel K. Inouye Intl","檀香山国际机场","Honolulu","檀香山","US",21.3245,-157.9251,-10],
+  ["GUM","A.B. Won Pat Intl","关岛国际机场","Guam","关岛","GU",13.4834,144.7960,10],
+  ["YVR","Vancouver Intl","温哥华国际机场","Vancouver","温哥华","CA",49.1967,-123.1815,-7],
+  ["YYZ","Toronto Pearson Intl","多伦多皮尔逊国际机场","Toronto","多伦多","CA",43.6777,-79.6248,-4],
+  /* Oceania */
+  ["SYD","Kingsford Smith","金斯福德·史密斯机场","Sydney","悉尼","AU",-33.9399,151.1753,10],
+  ["MEL","Melbourne Airport","墨尔本机场","Melbourne","墨尔本","AU",-37.6690,144.8410,10],
+  ["BNE","Brisbane Airport","布里斯班机场","Brisbane","布里斯班","AU",-27.3942,153.1218,10],
+  ["AKL","Auckland Airport","奥克兰机场","Auckland","奥克兰","NZ",-37.0082,174.7850,12],
+  ["POM","Jacksons Intl","杰克逊国际机场","Port Moresby","莫尔兹比港","PG",-9.4438,147.2200,10],
+  /* Africa */
+  ["CAI","Cairo Intl","开罗国际机场","Cairo","开罗","EG",30.1219,31.4056,2],
+  ["JNB","O.R. Tambo Intl","坦博国际机场","Johannesburg","约翰内斯堡","ZA",-26.1367,28.2411,2],
+  ["ADD","Bole Intl","博莱国际机场","Addis Ababa","亚的斯亚贝巴","ET",8.9779,38.7993,3],
+  ["NBO","Jomo Kenyatta Intl","乔莫·肯雅塔国际机场","Nairobi","内罗毕","KE",-1.3192,36.9278,3]
+];
+/* full English country name -> short badge code (aviation-relevant countries) */
+var COUNTRY2 = {
+ "China":"CN","Hong Kong":"HK","Macau":"MO","Taiwan":"TW","Philippines":"PH","Japan":"JP","South Korea":"KR",
+ "Singapore":"SG","Malaysia":"MY","Thailand":"TH","Vietnam":"VN","Cambodia":"KH","Myanmar":"MM","Laos":"LA",
+ "Indonesia":"ID","Brunei":"BN","India":"IN","Nepal":"NP","Sri Lanka":"LK","Bangladesh":"BD","Pakistan":"PK",
+ "Kazakhstan":"KZ","Uzbekistan":"UZ","Mongolia":"MN","United Arab Emirates":"AE","Qatar":"QA","Saudi Arabia":"SA",
+ "Kuwait":"KW","Bahrain":"BH","Oman":"OM","Turkey":"TR","Israel":"IL","Iran":"IR","Jordan":"JO",
+ "United Kingdom":"UK","France":"FR","Germany":"DE","Netherlands":"NL","Russia":"RU","Switzerland":"CH",
+ "Finland":"FI","Italy":"IT","Spain":"ES","Portugal":"PT","Belgium":"BE","Austria":"AT","Sweden":"SE",
+ "Norway":"NO","Denmark":"DK","Poland":"PL","Ireland":"IE","Greece":"GR","Czech Republic":"CZ","Hungary":"HU",
+ "United States":"US","Canada":"CA","Mexico":"MX","Brazil":"BR","Argentina":"AR","Chile":"CL","Peru":"PE","Colombia":"CO",
+ "Australia":"AU","New Zealand":"NZ","Papua New Guinea":"PG","Fiji":"FJ","Guam":"GU",
+ "Egypt":"EG","South Africa":"ZA","Ethiopia":"ET","Kenya":"KE","Morocco":"MA","Nigeria":"NG","Tanzania":"TZ",
+ "United States Minor Outlying Islands":"US"
+};
+function cc(country){ if(!country)return""; if(country.length<=3)return country; return COUNTRY2[country]||""; }
+
+/* Curated overlay: bilingual names for key CN/PH/hub airports.  row = [code,nameEn,nameZh,cityEn,cityZh,cc,lat,lon,tz] */
+var CURATED = {};
+AIRPORT_ROWS.forEach(function(r){ CURATED[r[0]] = {nameEn:r[1],nameZh:r[2],cityEn:r[3],cityZh:r[4],country:r[5],lat:r[6],lon:r[7],tz:r[8]}; });
+
+/* Build global airport map from OpenFlights, then overlay curated bilingual names. */
+var AIRPORTS = {}, AP_LIST = [];
+(function(){
+  var A = window.OF_AP || [];
+  for(var i=0;i<A.length;i++){
+    var r=A[i], code=r[0];
+    AIRPORTS[code] = { code:code, nameEn:r[1], nameZh:r[1], cityEn:r[2], cityZh:r[2], country:r[3], lat:r[4], lon:r[5], tz:(+r[6]||0), cc:cc(r[3]) };
+  }
+  for(var c in CURATED){ var cu=CURATED[c], ex=AIRPORTS[c]||{code:c,country:cu.country};
+    ex.code=c; ex.nameEn=cu.nameEn; ex.nameZh=cu.nameZh; ex.cityEn=cu.cityEn; ex.cityZh=cu.cityZh;
+    ex.lat=cu.lat; ex.lon=cu.lon; ex.tz=cu.tz; ex.cc=cu.country; if(!ex.country)ex.country=cu.country;
+    AIRPORTS[c]=ex;
+  }
+  for(var k in AIRPORTS){ var ap=AIRPORTS[k];
+    ap.hay=(ap.code+" "+ap.nameEn+" "+ap.nameZh+" "+ap.cityEn+" "+ap.cityZh+" "+ap.country).toLowerCase();
+    AP_LIST.push(ap);
+  }
+})();
+
+/* ---------------- airlines ----------------
+   code: [nameZh, nameEn, brandColor, isLCC, shortHaulAC, medHaulAC, longHaulAC] */
+var AIRLINES = {
+  PR:["菲律宾航空","Philippine Airlines","#5fb0ff",0,"A321","A330-300","B777-300ER"],
+  "5J":["宿务太平洋航空","Cebu Pacific","#ffd23f",1,"A320neo","A321neo","A330-900"],
+  Z2:["菲律宾亚洲航空","AirAsia Philippines","#ff5a5f",1,"A320","A320",null],
+  CX:["国泰航空","Cathay Pacific","#2ec4b6",0,"A321neo","A330-300","A350-1000"],
+  UO:["香港快运","HK Express","#b48cff",1,"A320neo","A321neo",null],
+  NX:["澳门航空","Air Macau","#7fd8be",0,"A320neo","A321neo",null],
+  CI:["中华航空","China Airlines","#ff9fb2",0,"A321neo","A330-300","A350-900"],
+  BR:["长荣航空","EVA Air","#63d471",0,"A321","A330-300","B777-300ER"],
+  NH:["全日空","ANA","#66c7ff",0,"A321neo","B787-9","B787-9"],
+  JL:["日本航空","Japan Airlines","#ff6b6b",0,"B737-800","B787-9","B777-300ER"],
+  KE:["大韩航空","Korean Air","#7cc7e8",0,"A321neo","A330-300","B777-300ER"],
+  OZ:["韩亚航空","Asiana Airlines","#e8a87c",0,"A321neo","A330-300","A350-900"],
+  "7C":["济州航空","Jeju Air","#ffa62b",1,"B737-800","B737-800",null],
+  TW:["德威航空","T'way Air","#f77fbe",1,"B737-800","B737-800",null],
+  SQ:["新加坡航空","Singapore Airlines","#f4c95d",0,"B737-8","A350-900","A350-900"],
+  TR:["酷航","Scoot","#ffd23f",1,"A320neo","B787-9","B787-9"],
+  MH:["马来西亚航空","Malaysia Airlines","#4ecdc4",0,"B737-800","A330-300","A350-900"],
+  AK:["亚洲航空","AirAsia","#ff5a5f",1,"A320","A320neo",null],
+  FD:["泰国亚航","Thai AirAsia","#ff5a5f",1,"A320","A320",null],
+  TG:["泰国国际航空","Thai Airways","#c9a0ff",0,"A320","A350-900","B777-300ER"],
+  VN:["越南航空","Vietnam Airlines","#8fd694",0,"A321neo","A350-900","B787-9"],
+  VJ:["越捷航空","VietJet Air","#ffd23f",1,"A321neo","A321neo",null],
+  GA:["印尼鹰航","Garuda Indonesia","#5eb1bf",0,"B737-800","A330-300","B777-300ER"],
+  BI:["文莱皇家航空","Royal Brunei","#f2d0a4",0,"A320neo","A320neo","B787-8"],
+  CA:["中国国际航空","Air China","#ff8c94",0,"A320neo","A330-300","A350-900"],
+  MU:["中国东方航空","China Eastern","#6fa8ff",0,"A320neo","A330-200","A350-900"],
+  CZ:["中国南方航空","China Southern","#6c9fff",0,"A320neo","A330-300","B787-9"],
+  HU:["海南航空","Hainan Airlines","#ffc95e",0,"B737-800","A330-300","B787-9"],
+  "3U":["四川航空","Sichuan Airlines","#f28fb1",0,"A320neo","A330-300","A350-900"],
+  ZH:["深圳航空","Shenzhen Airlines","#ff9c66",0,"B737-800","A330-300","A330-300"],
+  MF:["厦门航空","Xiamen Air","#5fd0d6",0,"B737-800","B787-9","B787-9"],
+  "9C":["春秋航空","Spring Airlines","#9ee37d",1,"A320neo","A321neo",null],
+  SC:["山东航空","Shandong Airlines","#8ecae6",0,"B737-800","B737-800",null],
+  GS:["天津航空","Tianjin Airlines","#d8b4fe",0,"A320","A330-300",null],
+  "8L":["祥鹏航空","Lucky Air","#fcbf49",1,"B737-800","B737-800",null],
+  EK:["阿联酋航空","Emirates","#f6bd60",0,"B777-300ER","B777-300ER","A380-800"],
+  EY:["阿提哈德航空","Etihad Airways","#e4c580",0,"B787-9","B787-9","B787-9"],
+  QR:["卡塔尔航空","Qatar Airways","#b76e79",0,"A320neo","B787-9","A350-900"],
+  SV:["沙特航空","Saudia","#7ac74f",0,"A320","A330-300","B787-9"],
+  KU:["科威特航空","Kuwait Airways","#6ab8ee",0,"A320neo","A330-800","A330-800"],
+  GF:["海湾航空","Gulf Air","#e9c46a",0,"A320neo","B787-9","B787-9"],
+  WY:["阿曼航空","Oman Air","#90be6d",0,"B737-800","B787-9","B787-9"],
+  TK:["土耳其航空","Turkish Airlines","#ef6461",0,"A321neo","A350-900","B777-300ER"],
+  BA:["英国航空","British Airways","#7096d1",0,"A320neo","B787-9","B777-300ER"],
+  AF:["法国航空","Air France","#8ab6f9",0,"A320","A350-900","B777-300ER"],
+  LH:["汉莎航空","Lufthansa","#ffd166",0,"A320neo","A350-900","B747-8"],
+  KL:["荷兰皇家航空","KLM","#6cc5e9",0,"B737-800","B787-9","B777-300ER"],
+  LX:["瑞士国际航空","SWISS","#f28482",0,"A320neo","B777-300ER","B777-300ER"],
+  AY:["芬兰航空","Finnair","#a3cef1",0,"A320","A350-900","A350-900"],
+  SU:["俄罗斯航空","Aeroflot","#f4a259",0,"A320neo","A330-300","B777-300ER"],
+  MS:["埃及航空","EgyptAir","#ffd97d",0,"A320neo","B787-9","B787-9"],
+  ET:["埃塞俄比亚航空","Ethiopian Airlines","#80ed99",0,"B737-800","A350-900","A350-900"],
+  UL:["斯里兰卡航空","SriLankan Airlines","#57cc99",0,"A320neo","A330-300","A330-300"],
+  QF:["澳洲航空","Qantas","#ff8fa3",0,"B737-800","A330-300","B787-9"],
+  PX:["新几内亚航空","Air Niugini","#f9c74f",0,"B737-800","B767-300","B767-300"],
+  NZ:["新西兰航空","Air New Zealand","#43aa8b",0,"A320neo","B787-9","B787-9"],
+  UA:["美国联合航空","United Airlines","#6d9dc5",0,"B737-800","B787-9","B777-300ER"],
+  DL:["达美航空","Delta Air Lines","#c17c9f",0,"B737-900","A350-900","A350-900"],
+  AC:["加拿大航空","Air Canada","#f08080",0,"A220-300","B787-9","B777-300LR"]
+};
+
+/* ---------------- routes ----------------
+   [from, to, "AL1,AL2,..."]  — bidirectional; curated real city-pairs.
+   Flight numbers/times/prices are synthesised (see disclaimer). */
+var ROUTE_ROWS_LEGACY = [   /* superseded by OpenFlights OF_RT; kept for reference only */
+  /* ===== Manila (MNL) ===== */
+  ["MNL","HKG","PR,5J,CX"],["MNL","MFM","5J,NX"],["MNL","TPE","PR,5J,CI,BR"],
+  ["MNL","NRT","PR,5J,NH,JL"],["MNL","HND","PR,NH"],["MNL","KIX","PR,5J"],
+  ["MNL","NGO","PR"],["MNL","FUK","PR"],["MNL","ICN","PR,5J,Z2,KE,OZ,7C,TW"],
+  ["MNL","PUS","PR,5J"],["MNL","SIN","PR,5J,SQ,TR"],["MNL","KUL","PR,5J,AK,MH"],
+  ["MNL","BKK","PR,5J,TG"],["MNL","DMK","FD"],["MNL","SGN","PR,5J,VN,VJ"],
+  ["MNL","HAN","5J,VN"],["MNL","PNH","5J"],["MNL","CGK","PR,5J,GA"],
+  ["MNL","DPS","PR"],["MNL","BWN","BI"],
+  ["MNL","DXB","PR,EK,5J"],["MNL","AUH","EY"],["MNL","DOH","QR,PR"],
+  ["MNL","RUH","PR,SV"],["MNL","JED","SV"],["MNL","KWI","KU"],["MNL","BAH","GF"],
+  ["MNL","MCT","WY"],["MNL","IST","TK"],["MNL","LHR","PR"],
+  ["MNL","LAX","PR"],["MNL","SFO","PR,UA"],["MNL","SEA","PR"],["MNL","JFK","PR"],
+  ["MNL","HNL","PR"],["MNL","GUM","PR,UA"],["MNL","YVR","PR,AC"],["MNL","YYZ","PR,AC"],
+  ["MNL","SYD","PR,QF"],["MNL","MEL","PR"],["MNL","AKL","PR"],["MNL","POM","PX"],
+  ["MNL","PEK","CA,PR"],["MNL","PVG","PR,5J,MU"],["MNL","CAN","CZ,PR,5J"],
+  ["MNL","SZX","ZH"],["MNL","XMN","MF,PR,5J"],["MNL","JJN","PR,5J"],
+  ["MNL","CEB","PR,5J,Z2"],["MNL","DVO","PR,5J,Z2"],["MNL","ILO","PR,5J"],
+  ["MNL","PPS","PR,5J,Z2"],["MNL","TAG","PR,5J"],["MNL","KLO","PR,5J"],["MNL","LAO","PR"],
+  /* ===== Cebu (CEB) ===== */
+  ["CEB","HKG","5J,CX"],["CEB","ICN","PR,5J,KE"],["CEB","NRT","PR,5J"],
+  ["CEB","SIN","5J,TR"],["CEB","TPE","5J"],["CEB","CAN","CZ"],
+  ["CEB","DVO","PR,5J"],["CEB","ILO","5J"],["CEB","PPS","5J"],
+  /* ===== Clark (CRK) ===== */
+  ["CRK","ICN","5J,Z2"],["CRK","SIN","TR"],["CRK","DOH","QR"],["CRK","DXB","EK"],
+  ["CRK","CEB","5J"],
+  /* ===== other PH intl ===== */
+  ["DVO","SIN","TR"],
+  ["KLO","ICN","PR,5J"],
+  ["TAG","ICN","PR"],
+  ["LAO","MNL","PR"],
+  /* ===== Beijing Capital (PEK) ===== */
+  ["PEK","HKG","CA,CX"],["PEK","TPE","CA,CI,BR"],["PEK","NRT","CA,NH"],
+  ["PEK","HND","CA,NH,JL"],["PEK","ICN","CA,KE,OZ"],["PEK","SIN","CA,SQ"],
+  ["PEK","BKK","CA,TG"],["PEK","KUL","MH"],["PEK","SGN","VN"],["PEK","HAN","VN"],
+  ["PEK","FRA","CA,LH"],["PEK","CDG","CA,AF"],["PEK","LHR","CA,BA"],["PEK","AMS","KL"],
+  ["PEK","SVO","SU,CA"],["PEK","IST","TK"],["PEK","DXB","EK,CA"],["PEK","DOH","QR"],
+  ["PEK","JFK","CA"],["PEK","LAX","CA"],["PEK","SFO","CA,UA"],["PEK","YVR","CA,AC"],
+  ["PEK","SYD","CA"],["PEK","FCO","CA"],["PEK","HEL","AY"],["PEK","CAI","MS"],
+  /* ===== Beijing Daxing (PKX) ===== */
+  ["PKX","LHR","BA"],["PKX","HEL","AY"],["PKX","ICN","MU"],["PKX","BKK","CZ"],["PKX","HKG","UO"],
+  /* ===== Shanghai Pudong (PVG) ===== */
+  ["PVG","HKG","CX,MU"],["PVG","TPE","CI,BR,MU"],["PVG","MFM","NX"],
+  ["PVG","NRT","MU,NH,JL"],["PVG","HND","MU,NH"],["PVG","KIX","MU,9C"],
+  ["PVG","NGO","MU"],["PVG","FUK","MU"],["PVG","CTS","MU"],
+  ["PVG","ICN","MU,KE,OZ,9C"],["PVG","PUS","MU"],["PVG","SIN","SQ,MU"],
+  ["PVG","KUL","MH"],["PVG","BKK","TG,MU,9C"],["PVG","SGN","VN,MU"],["PVG","HAN","VN"],
+  ["PVG","DAD","VJ"],["PVG","CGK","GA"],["PVG","DPS","MU"],["PVG","HKT","MU"],
+  ["PVG","DXB","EK"],["PVG","AUH","EY"],["PVG","DOH","QR"],["PVG","IST","TK"],["PVG","SVO","SU"],
+  ["PVG","FRA","LH"],["PVG","MUC","LH"],["PVG","CDG","AF,MU"],["PVG","AMS","KL"],
+  ["PVG","LHR","BA,MU"],["PVG","ZRH","LX"],["PVG","HEL","AY"],
+  ["PVG","LAX","MU,UA"],["PVG","JFK","MU"],["PVG","SFO","UA,MU"],["PVG","SEA","DL"],
+  ["PVG","DTW","DL"],["PVG","YVR","AC"],["PVG","YYZ","AC"],
+  ["PVG","SYD","MU"],["PVG","MEL","MU"],["PVG","AKL","MU,NZ"],
+  ["PVG","CEB","PR"],
+  /* ===== Shanghai Hongqiao (SHA) ===== */
+  ["SHA","HND","MU,NH"],["SHA","GMP","MU,KE"],["SHA","HKG","MU"],
+  /* ===== Guangzhou (CAN) ===== */
+  ["CAN","TPE","CI,CZ"],["CAN","NRT","CZ"],["CAN","KIX","CZ"],["CAN","ICN","CZ,KE"],
+  ["CAN","SIN","SQ,CZ"],["CAN","KUL","MH,AK"],["CAN","BKK","TG,CZ"],
+  ["CAN","SGN","VN,CZ"],["CAN","HAN","VN"],["CAN","PNH","CZ"],["CAN","CGK","GA,CZ"],
+  ["CAN","DPS","CZ"],["CAN","KTM","CZ"],["CAN","CMB","UL"],
+  ["CAN","DXB","EK,CZ"],["CAN","AUH","EY"],["CAN","DOH","QR"],["CAN","JED","SV"],["CAN","IST","TK"],
+  ["CAN","CDG","AF,CZ"],["CAN","AMS","KL,CZ"],["CAN","FRA","CZ"],["CAN","LHR","CZ"],
+  ["CAN","LAX","CZ"],["CAN","SFO","CZ"],["CAN","JFK","CZ"],["CAN","YVR","CZ"],
+  ["CAN","SYD","CZ"],["CAN","MEL","CZ"],["CAN","BNE","CZ"],["CAN","AKL","CZ"],
+  ["CAN","JNB","CZ"],["CAN","ADD","ET"],
+  /* ===== Shenzhen (SZX) ===== */
+  ["SZX","NRT","ZH"],["SZX","ICN","ZH"],["SZX","SIN","SQ,ZH"],["SZX","BKK","ZH"],["SZX","KUL","AK"],
+  /* ===== Chengdu (TFU/CTU) ===== */
+  ["TFU","BKK","3U"],["TFU","ICN","3U"],["TFU","SIN","3U"],["TFU","KUL","AK"],
+  ["CTU","HKG","CA,CX"],["CTU","KTM","CA"],
+  /* ===== Chongqing (CKG) ===== */
+  ["CKG","HKG","CX"],["CKG","ICN","OZ"],["CKG","SIN","TR"],["CKG","BKK","9C"],
+  /* ===== Kunming (KMG) ===== */
+  ["KMG","BKK","TG,MU,8L"],["KMG","CNX","8L"],["KMG","RGN","MU"],["KMG","VTE","MU"],
+  ["KMG","SGN","MU"],["KMG","HAN","VN"],["KMG","KUL","AK"],["KMG","SIN","MU"],
+  ["KMG","KTM","MU"],["KMG","HKG","CX"],["KMG","DPS","8L"],
+  /* ===== Bali (DPS) — more real China/HK leisure links ===== */
+  ["HKG","DPS","CX"],["SZX","DPS","CZ"],["CTU","DPS","3U"],["XMN","DPS","MF"],
+  /* ===== Xi'an (XIY) ===== */
+  ["XIY","HKG","MU"],["XIY","ICN","MU"],["XIY","SIN","TR"],["XIY","BKK","9C"],
+  /* ===== Hangzhou (HGH) ===== */
+  ["HGH","HKG","CX"],["HGH","ICN","MU"],["HGH","NRT","CA"],["HGH","KIX","CA"],
+  ["HGH","SIN","TR"],["HGH","BKK","9C"],["HGH","KUL","AK"],
+  /* ===== Nanjing (NKG) ===== */
+  ["NKG","HKG","MU"],["NKG","ICN","MU"],["NKG","KIX","MU"],["NKG","SIN","MU"],
+  ["NKG","FRA","LH"],["NKG","LAX","MU"],
+  /* ===== Wuhan (WUH) ===== */
+  ["WUH","HKG","CX"],["WUH","ICN","MU"],["WUH","SIN","TR"],["WUH","BKK","9C"],
+  ["WUH","CDG","AF"],["WUH","SFO","CZ"],
+  /* ===== Changsha (CSX) ===== */
+  ["CSX","BKK","FD"],["CSX","KUL","AK"],["CSX","FRA","MU"],["CSX","LAX","HU"],["CSX","NBO","CZ"],
+  /* ===== Xiamen (XMN) ===== */
+  ["XMN","HKG","CX,MF"],["XMN","TPE","MF,CI"],["XMN","NRT","MF"],["XMN","KIX","MF"],
+  ["XMN","ICN","MF"],["XMN","SIN","MF,SQ"],["XMN","KUL","MF,AK"],["XMN","BKK","MF"],
+  ["XMN","SGN","MF"],["XMN","CGK","MF"],["XMN","AMS","MF"],["XMN","LAX","MF"],["XMN","SYD","MF"],
+  /* ===== Fuzhou (FOC) ===== */
+  ["FOC","HKG","MF"],["FOC","SIN","MF"],["FOC","KUL","AK"],["FOC","JFK","MF"],
+  /* ===== Qingdao (TAO) ===== */
+  ["TAO","ICN","SC,OZ"],["TAO","NRT","SC"],["TAO","HKG","SC"],["TAO","SIN","TR"],["TAO","BKK","SC"],
+  /* ===== Tianjin (TSN) ===== */
+  ["TSN","ICN","OZ"],["TSN","BKK","GS"],
+  /* ===== Dalian (DLC) ===== */
+  ["DLC","ICN","KE"],["DLC","NRT","JL"],["DLC","KIX","CZ"],
+  /* ===== Shenyang (SHE) ===== */
+  ["SHE","ICN","CZ"],["SHE","NRT","CZ"],
+  /* ===== Harbin (HRB) ===== */
+  ["HRB","ICN","CZ"],
+  /* ===== Ürümqi (URC) ===== */
+  ["URC","ALA","CZ"],
+  /* ===== Sanya / Haikou ===== */
+  ["SYX","HKG","UO"],["SYX","SIN","TR"],["SYX","KUL","AK"],
+  ["HAK","HKG","HU"],["HAK","BKK","HU"],["HAK","KUL","AK"],
+  /* ===== Nanning / Guilin / Zhengzhou / Wenzhou ===== */
+  ["NNG","HAN","CZ"],["NNG","BKK","FD"],["NNG","KUL","AK"],
+  ["KWL","HKG","CX"],["KWL","BKK","FD"],["KWL","KUL","AK"],
+  ["CGO","ICN","CZ"],["CGO","BKK","9C"],["CGO","LHR","CZ"],
+  ["WNZ","FCO","MU"],
+  /* ===== calibration: post-2014 new airports (Daxing 2019 / Tianfu 2021) & recent routes — real, targeted (not an exhaustive 37k audit) ===== */
+  ["PKX","BKK","TG,CA"],["PKX","SIN","SQ"],["PKX","DXB","EK"],["PKX","CDG","AF"],["PKX","KUL","AK"],["PKX","ICN","OZ"],["PKX","CAN","CZ"],["PKX","PVG","MU"],
+  ["TFU","DOH","QR"],["TFU","DXB","EK"],["TFU","MEL","3U"],["TFU","SIN","3U,SQ"],
+  ["CAN","DPS","CZ"],["PVG","DPS","MU"],["SZX","DPS","CZ"],["HKG","DPS","CX"],["CTU","DPS","3U"],["XMN","DPS","MF"],["KMG","DPS","8L"],
+  ["SZX","SIN","SQ,ZH"],["HGH","BKK","9C,HU"],["XIY","ICN","MU,KE"]
+];
+/* pairs to hide (clearly ceased / erroneous in the historical dataset). format: "SRC>DST". Applied both directions. */
+var ROUTE_BLOCK = {};
+
+/* ---------------- data engine ---------------- */
+function h32(s){ var h=2166136261; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function haversine(a,b){
+  var R=6371, dLa=(b.lat-a.lat)*Math.PI/180, dLo=(b.lon-a.lon)*Math.PI/180;
+  var la1=a.lat*Math.PI/180, la2=b.lat*Math.PI/180;
+  var x=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(la1)*Math.cos(la2)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return 2*R*Math.asin(Math.sqrt(x));
+}
+/* ---- airline / aircraft helpers ---- */
+function alColor(al){ var A=AIRLINES[al]; if(A) return A[2]; if(al==='--') return '#8aa0c8'; return 'hsl('+(h32(al)%360)+',58%,63%)'; }
+function alLCC(al){ var A=AIRLINES[al]; return A?!!A[3]:false; }
+var AC_MAP={
+ "318":"A318","319":"A319","31N":"A319neo","320":"A320","32A":"A320","32N":"A320neo","321":"A321","32B":"A321","32Q":"A321neo","32S":"A320 系列",
+ "332":"A330-200","333":"A330-300","338":"A330-800","339":"A330-900","33X":"A330","343":"A340-300","346":"A340-600",
+ "351":"A350-1000","359":"A350-900","35K":"A350-1000","380":"A380","388":"A380","223":"A220-300","221":"A220-100",
+ "737":"B737","73G":"B737-700","73H":"B737-800","738":"B737-800","739":"B737-900","73W":"B737-700","73J":"B737-900","7M8":"B737 MAX 8","7M9":"B737 MAX 9","7M7":"B737 MAX 7",
+ "744":"B747-400","748":"B747-8","752":"B757-200","753":"B757-300","763":"B767-300","764":"B767-400",
+ "772":"B777-200","77L":"B777-200LR","773":"B777-300","77W":"B777-300ER","778":"B777-8","779":"B777-9",
+ "788":"B787-8","789":"B787-9","78J":"B787-10","781":"B787-10",
+ "E70":"E170","E75":"E175","E90":"E190","E95":"E195","290":"E190","295":"E195","AT7":"ATR 72","AT5":"ATR 42","DH4":"Dash 8 Q400",
+ "CR2":"CRJ-200","CR7":"CRJ-700","CR9":"CRJ-900","CRK":"CRJ-1000","SU9":"SSJ100","ARJ":"ARJ21","100":"Fokker 100","M90":"MD-90","M88":"MD-88"
+};
+function acName(code){ return AC_MAP[code]||code; }
+function acByDist(al,dist){ var A=AIRLINES[al];
+  if(A){ if(dist<1600)return A[4]; if(dist<4200)return A[5]||A[4]; return A[6]||A[5]||A[4]; }
+  return dist<1500?"A320":(dist<4500?"A330-300":"B787-9");
+}
+
+/* ---- ROUTE_MAP from OpenFlights OF_RT (undirected: A-B => queryable both ways) ---- */
+var ROUTE_MAP={}, DEG={};
+(function(){
+  function addEdge(s,d,alArr,eq){
+    if(!AIRPORTS[s]||!AIRPORTS[d]) return;
+    ROUTE_MAP[s]=ROUTE_MAP[s]||{};
+    var cell=ROUTE_MAP[s][d];
+    if(!cell){ ROUTE_MAP[s][d]={al:alArr.slice(),eq:eq||""}; }
+    else{ for(var k=0;k<alArr.length;k++) if(alArr[k]&&cell.al.indexOf(alArr[k])<0) cell.al.push(alArr[k]); if(!cell.eq&&eq)cell.eq=eq; }
+  }
+  var Rt=window.OF_RT||[],i;
+  for(i=0;i<Rt.length;i++){ addEdge(Rt[i][0],Rt[i][1], Rt[i][2]?Rt[i][2].split(","):[], Rt[i][3]||""); }
+  /* curated supplement: recent / accurate real routes incl. post-2014 airports (PKX, TFU) & Bali fixes */
+  if(typeof ROUTE_ROWS_LEGACY!=='undefined'){
+    for(i=0;i<ROUTE_ROWS_LEGACY.length;i++){ var r=ROUTE_ROWS_LEGACY[i], als=r[2].split(",");
+      addEdge(r[0],r[1],als,""); addEdge(r[1],r[0],als,"");
+    }
+  }
+  /* mirror any still-missing reverses (undirected guarantee) */
+  var os=Object.keys(ROUTE_MAP);
+  for(i=0;i<os.length;i++){ var o=os[i], ds=Object.keys(ROUTE_MAP[o]);
+    for(var j=0;j<ds.length;j++){ var dd=ds[j];
+      ROUTE_MAP[dd]=ROUTE_MAP[dd]||{};
+      if(!ROUTE_MAP[dd][o]) ROUTE_MAP[dd][o]={al:ROUTE_MAP[o][dd].al.slice(),eq:ROUTE_MAP[o][dd].eq};
+    }
+  }
+  /* apply block list (both directions) */
+  if(typeof ROUTE_BLOCK!=='undefined'){
+    for(var bk in ROUTE_BLOCK){ var pr=bk.split(">"), s2=pr[0], d2=pr[1];
+      if(ROUTE_MAP[s2]) delete ROUTE_MAP[s2][d2];
+      if(ROUTE_MAP[d2]) delete ROUTE_MAP[d2][s2];
+    }
+  }
+  for(var c in ROUTE_MAP) DEG[c]=Object.keys(ROUTE_MAP[c]).length;
+})();
+
+function pad2(n){ return (n<10?"0":"")+n; }
+function fmtTime(min){ min=((min%1440)+1440)%1440; return pad2(Math.floor(min/60))+":"+pad2(min%60); }
+/* Build reference flights for one directed leg (deterministic). */
+function flightsFor(o,d){
+  var rt=(ROUTE_MAP[o]||{})[d]; if(!rt) return null;
+  var als=(rt.al&&rt.al.length)?rt.al:["--"];
+  var eqList=rt.eq?rt.eq.split(" ").filter(function(x){return x;}):[];
+  var A=AIRPORTS[o], B=AIRPORTS[d], dist=haversine(A,B), out=[];
+  var durMin=Math.round(dist/820*60+35);
+  als.forEach(function(al){
+    var key=o+d+al, hh=h32(key);
+    var n=1+(hh%2); if(dist>7500) n=1;
+    var base=100+(hh%800);
+    for(var i=0;i<n;i++){
+      var h2=h32(key+"#"+i);
+      var dep=330+(h2%1080); dep=Math.round(dep/5)*5;
+      var arr=dep+durMin+ (B.tz-A.tz)*60;
+      var ac=eqList.length?acName(eqList[h2%eqList.length]):acByDist(al,dist);
+      var price=(35+dist*0.075)*(alLCC(al)?0.62:1)*(dist>4500?1.15:1);
+      price=price*(1+(((h2>>4)%37)-18)/100);
+      price=Math.max(40,Math.round(price/5)*5);
+      out.push({
+        al:al, no:al+" "+(base+i*(2+(h2%6))), ac:ac,
+        dep:dep, arr:arr, plus:(arr>=1440?1:(arr<0?-1:0)),
+        dur:durMin, price:Math.round(price), dist:Math.round(dist)
+      });
+    }
+  });
+  out.sort(function(x,y){ return x.dep-y.dep; });
+  return out;
+}
+function getDestinations(o){
+  var m=ROUTE_MAP[o]; if(!m) return [];
+  var A=AIRPORTS[o], res=[];
+  Object.keys(m).forEach(function(d){
+    if(!AIRPORTS[d]) return;
+    var fl=flightsFor(o,d)||[];
+    if(!fl.length) return;
+    var minP=1e9, als={};
+    fl.forEach(function(f){ if(f.price<minP)minP=f.price; als[f.al]=1; });
+    res.push({ code:d, dist:Math.round(haversine(A,AIRPORTS[d])), flights:fl, minPrice:minP, carriers:Object.keys(als) });
+  });
+  return res;
+}
+
+/* ---- region model (for destination filtering) ---- */
+var REGION_ORDER=['EA','SEA','SASIA','EU','NA','OC','AF','SAM'];
+var REGION_BY_COUNTRY={
+ "China":"EA","Hong Kong":"EA","Macau":"EA","Taiwan":"EA","Japan":"EA","South Korea":"EA","North Korea":"EA","Mongolia":"EA",
+ "Philippines":"SEA","Singapore":"SEA","Malaysia":"SEA","Thailand":"SEA","Vietnam":"SEA","Cambodia":"SEA","Myanmar":"SEA","Laos":"SEA","Indonesia":"SEA","Brunei":"SEA","Timor-Leste":"SEA",
+ "India":"SASIA","Nepal":"SASIA","Sri Lanka":"SASIA","Bangladesh":"SASIA","Pakistan":"SASIA","Maldives":"SASIA","Bhutan":"SASIA","Afghanistan":"SASIA",
+ "Kazakhstan":"SASIA","Uzbekistan":"SASIA","Turkmenistan":"SASIA","Kyrgyzstan":"SASIA","Tajikistan":"SASIA",
+ "United Arab Emirates":"SASIA","Qatar":"SASIA","Saudi Arabia":"SASIA","Kuwait":"SASIA","Bahrain":"SASIA","Oman":"SASIA","Turkey":"SASIA","Israel":"SASIA","Iran":"SASIA","Jordan":"SASIA","Lebanon":"SASIA","Iraq":"SASIA","Yemen":"SASIA",
+ "United Kingdom":"EU","France":"EU","Germany":"EU","Netherlands":"EU","Russia":"EU","Switzerland":"EU","Finland":"EU","Italy":"EU","Spain":"EU","Portugal":"EU","Belgium":"EU","Austria":"EU","Sweden":"EU","Norway":"EU","Denmark":"EU","Poland":"EU","Ireland":"EU","Greece":"EU","Czech Republic":"EU","Hungary":"EU","Romania":"EU","Ukraine":"EU","Iceland":"EU","Croatia":"EU","Serbia":"EU","Bulgaria":"EU","Luxembourg":"EU",
+ "United States":"NA","Canada":"NA","Mexico":"NA","Guam":"NA","Puerto Rico":"NA","Costa Rica":"NA","Panama":"NA","Cuba":"NA","Dominican Republic":"NA","Guatemala":"NA","Jamaica":"NA","Bahamas":"NA",
+ "Australia":"OC","New Zealand":"OC","Papua New Guinea":"OC","Fiji":"OC","New Caledonia":"OC","French Polynesia":"OC","Samoa":"OC","Vanuatu":"OC","Palau":"OC",
+ "Egypt":"AF","South Africa":"AF","Ethiopia":"AF","Kenya":"AF","Morocco":"AF","Nigeria":"AF","Tanzania":"AF","Ghana":"AF","Algeria":"AF","Tunisia":"AF","Angola":"AF","Mauritius":"AF","Senegal":"AF","Uganda":"AF","Ivory Coast":"AF","Rwanda":"AF","Seychelles":"AF","Zambia":"AF","Zimbabwe":"AF",
+ "Brazil":"SAM","Argentina":"SAM","Chile":"SAM","Peru":"SAM","Colombia":"SAM","Ecuador":"SAM","Uruguay":"SAM","Bolivia":"SAM","Venezuela":"SAM","Paraguay":"SAM","Guyana":"SAM"
+};
+function regionOf(code){
+  var ap=AIRPORTS[code]; if(!ap) return 'OTHER';
+  var r=REGION_BY_COUNTRY[ap.country]; if(r) return r;
+  var la=ap.lat, lo=ap.lon;   /* coordinate fallback for uncatalogued countries */
+  if(lo>=95&&lo<=180&&la<=13&&la>=-11) return 'SEA';
+  if(lo>=100&&la>13) return 'EA';
+  if(lo>=40&&lo<100) return 'SASIA';
+  if(lo>=110&&la<-11) return 'OC';
+  if(lo>=-25&&lo<40) return (la<13?'AF':'EU');
+  if(lo<-25) return (la>13?'NA':'SAM');
+  return 'OTHER';
+}
+/* shared: destinations for current origin honouring the active region filter */
+function currentDestinations(){
+  if(!state.origin) return [];
+  var d=getDestinations(state.origin);
+  if(state.dest) return d.filter(function(x){return x.code===state.dest;});
+  if(state.region&&state.region!=='all') d=d.filter(function(x){return regionOf(x.code)===state.region;});
+  return d;
+}
+/* which regions actually have destinations from this origin (to show only relevant chips) */
+function availableRegions(){
+  if(!state.origin) return [];
+  var seen={}, d=getDestinations(state.origin);
+  d.forEach(function(x){ seen[regionOf(x.code)]=1; });
+  return REGION_ORDER.filter(function(r){return seen[r];});
+}
+
+/* ---------------- i18n helpers ---------------- */
+function cityName(ap){ return LANG==='zh'?ap.cityZh:ap.cityEn; }
+function apName(ap){ return LANG==='zh'?ap.nameZh:ap.nameEn; }
+function alName(al){ var A=AIRLINES[al]; if(A) return LANG==='zh'?A[0]:A[1];
+  if(window.OF_AL&&OF_AL[al]) return OF_AL[al];
+  if(al==='--') return LANG==='zh'?'多家/未知航司':'various / n/a'; return al; }
+function fmtDur(min){
+  var h=Math.floor(min/60), m=min%60;
+  return LANG==='zh' ? (h+T('dur_h')+(m?m+T('dur_m'):'')) : (h+T('dur_h')+' '+m+T('dur_m'));
+}
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(function(el){ el.innerHTML=T(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(function(el){ el.placeholder=T(el.getAttribute('data-i18n-ph')); });
+  document.documentElement.lang = LANG==='zh'?'zh-CN':'en';
+  document.title = LANG==='zh' ? 'FlightScope · 直飞航线探索' : 'FlightScope · Direct Route Explorer';
+  document.getElementById('btn-lang').textContent = LANG==='zh'?'EN':'中';
+  var rotBtn=document.getElementById('btn-rot');
+  rotBtn.querySelector('span').textContent = state.autoRotate?T('rotOn'):T('rotOff');
+}
+
+/* =====================================================================
+   3D GLOBE ENGINE
+   ===================================================================== */
+var state={ origin:null, dest:null, sort:'dist', region:'all', timeBand:'all', alFilter:'all', autoRotate:true, hoveredDest:-1, reduced:false };
+try{ state.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+if(state.reduced) state.autoRotate=false;
+
+var G={};  // globe runtime handles
+
+function latLon(lat,lon,r){
+  var phi=(90-lat)*Math.PI/180, th=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(th), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(th));
+}
+var R=100;
+
+function initGlobe(){
+  var stage=document.querySelector('.stage'), holder=document.getElementById('holder');
+  var W=stage.clientWidth,H=stage.clientHeight;
+  var scene=new THREE.Scene();
+  var camera=new THREE.PerspectiveCamera(40,W/H,1,4000); camera.position.set(0,0,315);
+  var renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setSize(W,H); renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  holder.appendChild(renderer.domElement);
+  scene.add(new THREE.AmbientLight(0x2a3a66,0.95));
+  var dl=new THREE.DirectionalLight(0x9ec1ff,1.05); dl.position.set(-1,.5,1.2); scene.add(dl);
+
+  /* textures */
+  function glowTex(){
+    var c=document.createElement('canvas');c.width=c.height=128;var x=c.getContext('2d');
+    var g=x.createRadialGradient(64,64,0,64,64,64);
+    g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.3,'rgba(255,255,255,.8)');
+    g.addColorStop(.6,'rgba(255,255,255,.22)');g.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=g;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(c);
+  }
+  function ringTex(){
+    var c=document.createElement('canvas');c.width=c.height=128;var x=c.getContext('2d');
+    x.strokeStyle='rgba(255,255,255,1)';x.lineWidth=5;
+    x.beginPath();x.arc(64,64,56,0,Math.PI*2);x.stroke();
+    return new THREE.CanvasTexture(c);
+  }
+  function planeTex(){
+    var c=document.createElement('canvas');c.width=c.height=64;var x=c.getContext('2d');
+    x.translate(32,32); x.fillStyle='#fff';
+    x.beginPath();
+    x.moveTo(26,0); x.lineTo(8,5); x.lineTo(-2,22); x.lineTo(-8,20); x.lineTo(-3,5);
+    x.lineTo(-16,7); x.lineTo(-22,13); x.lineTo(-26,11); x.lineTo(-20,2);
+    x.lineTo(-20,-2); x.lineTo(-26,-11); x.lineTo(-22,-13); x.lineTo(-16,-7);
+    x.lineTo(-3,-5); x.lineTo(-8,-20); x.lineTo(-2,-22); x.lineTo(8,-5);
+    x.closePath(); x.fill();
+    return new THREE.CanvasTexture(c);
+  }
+  var GLOW=glowTex(), RING=ringTex(), PLANE=planeTex();
+
+  var globe=new THREE.Group(); scene.add(globe);
+  globe.add(new THREE.Mesh(new THREE.SphereGeometry(R*0.992,64,64),
+    new THREE.MeshPhongMaterial({color:0x0a1326,emissive:0x060c1c,specular:0x12305f,shininess:9})));
+
+  /* graticule (faint) */
+  var gridMat=new THREE.LineBasicMaterial({color:0x3f7fd0,transparent:true,opacity:0.07,blending:THREE.AdditiveBlending,depthWrite:false});
+  function gLine(pts){ return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),gridMat); }
+  for(var lo=-180;lo<180;lo+=30){ var p=[]; for(var la=-90;la<=90;la+=4)p.push(latLon(la,lo,R*1.002)); globe.add(gLine(p)); }
+  for(var la2=-60;la2<=60;la2+=30){ var q=[]; for(var lo2=-180;lo2<=180;lo2+=4)q.push(latLon(la2,lo2,R*1.002)); globe.add(gLine(q)); }
+
+  /* atmosphere */
+  var atmo=new THREE.Mesh(new THREE.SphereGeometry(R,48,48),new THREE.ShaderMaterial({
+    transparent:true,blending:THREE.AdditiveBlending,side:THREE.BackSide,depthWrite:false,
+    uniforms:{c:{value:new THREE.Color(0x4f9bff)}},
+    vertexShader:"varying float i;void main(){vec3 n=normalize(normalMatrix*normal);vec3 v=normalize((modelViewMatrix*vec4(position,1.0)).xyz);i=pow(1.0-abs(dot(n,v)),3.2);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
+    fragmentShader:"varying float i;uniform vec3 c;void main(){gl_FragColor=vec4(c,1.0)*i*1.35;}"
+  }));
+  atmo.scale.setScalar(1.16); globe.add(atmo);
+
+  /* stars */
+  (function(){
+    var n=1300,pos=new Float32Array(n*3);
+    for(var i=0;i<n;i++){var u=Math.random()*2-1,a=Math.random()*Math.PI*2,s=Math.sqrt(1-u*u),r=700+Math.random()*900;
+      pos[i*3]=r*s*Math.cos(a);pos[i*3+1]=r*u;pos[i*3+2]=r*s*Math.sin(a);}
+    var g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x9fb6e0,size:1.6,transparent:true,opacity:.8,depthWrite:false})));
+  })();
+
+  /* countries: borders (110m) + dotted land — chunked, non-blocking */
+  (function loadLand(){
+    var loadEl=document.getElementById('map-load');
+    function go(){
+      if(typeof topojson==='undefined'){ return setTimeout(go,60); }
+      var j=function(u){ return fetch(u).then(function(r){return r.json();}); };
+      Promise.all([
+        j('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
+        j('https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json')
+      ]).then(function(res){
+        var bT=res[0], lT=res[1];
+        buildBorders(topojson.mesh(bT,bT.objects.countries));
+        var lf=topojson.feature(lT,lT.objects.land);
+        buildDots(lf.type==='FeatureCollection'?lf.features:[lf]);
+        if(loadEl){ loadEl.style.opacity=0; setTimeout(function(){loadEl.remove();},450); }
+      }).catch(function(e){ console.warn('land load failed',e); if(loadEl) loadEl.textContent='map unavailable'; });
+    }
+    go();
+  })();
+  function buildBorders(mesh){
+    var segs=[];
+    mesh.coordinates.forEach(function(line){
+      for(var i=0;i<line.length-1;i++){
+        var a=latLon(line[i][1],line[i][0],R*1.004),b=latLon(line[i+1][1],line[i+1][0],R*1.004);
+        segs.push(a.x,a.y,a.z,b.x,b.y,b.z);
+      }
+    });
+    var g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(segs),3));
+    globe.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x6fd2f2,transparent:true,opacity:0.38,blending:THREE.AdditiveBlending,depthWrite:false})));
+  }
+  function buildDots(feats){
+    var polys=[];
+    function bbox(r){var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(var i=0;i<r.length;i++){var p=r[i];if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];}return[x0,y0,x1,y1];}
+    feats.forEach(function(f){var g=f.geometry;if(!g)return;
+      var list=g.type==='Polygon'?[g.coordinates]:(g.type==='MultiPolygon'?g.coordinates:[]);
+      list.forEach(function(poly){polys.push({outer:poly[0],holes:poly.slice(1),bb:bbox(poly[0])});});
+    });
+    function inRing(lon,lat,ring){var ins=false;
+      for(var i=0,j=ring.length-1;i<ring.length;j=i++){var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+        if(((yi>lat)!=(yj>lat))&&(lon<(xj-xi)*(lat-yi)/(yj-yi)+xi))ins=!ins;}
+      return ins;}
+    function isLand(lon,lat){
+      for(var k=0;k<polys.length;k++){var p=polys[k],b=p.bb;
+        if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3])continue;
+        if(inRing(lon,lat,p.outer)){var hole=false;
+          for(var h=0;h<p.holes.length;h++){if(inRing(lon,lat,p.holes[h])){hole=true;break;}}
+          if(!hole)return true;}}
+      return false;}
+    var pts=[],lats=[];for(var L=-84;L<=84;L+=1.9)lats.push(L);
+    var li=0;
+    (function chunk(){
+      var end=Math.min(li+8,lats.length);
+      for(;li<end;li++){var lat=lats[li],c=Math.cos(lat*Math.PI/180),st=1.9/Math.max(0.16,c);
+        for(var lon=-180;lon<180;lon+=st){if(isLand(lon,lat)){var v=latLon(lat,lon,R*1.004);pts.push(v.x,v.y,v.z);}}}
+      if(li<lats.length){setTimeout(chunk,0);return;}
+      var g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pts),3));
+      globe.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x2ea6c4,size:1.5,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false})));
+    })();
+  }
+
+  /* ---- dynamic network layer ---- */
+  var net=new THREE.Group(); globe.add(net);
+  var arcs=[], markers=[], planes=[], originGrp=null, rings=[];
+
+  function labelTex(txt){
+    var pad=8,f=24,c=document.createElement('canvas'),x=c.getContext('2d');
+    x.font='600 '+f+'px "Space Grotesk",-apple-system,sans-serif';
+    var w=Math.ceil(x.measureText(txt).width)+pad*2;c.width=w;c.height=f+pad*2;
+    x=c.getContext('2d');x.font='600 '+f+'px "Space Grotesk",-apple-system,sans-serif';
+    x.textBaseline='middle';x.shadowColor='rgba(0,0,0,.9)';x.shadowBlur=7;x.fillStyle='#eaf2ff';x.fillText(txt,pad,c.height/2);
+    var t=new THREE.CanvasTexture(c);t.userData={w:w,h:c.height};return t;
+  }
+  function disposeObj(o){
+    o.traverse?o.traverse(function(m){
+      if(m.geometry)m.geometry.dispose();
+      if(m.material){ if(m.material.map&&m.material.map.userData)m.material.map.dispose(); m.material.dispose(); }
+    }):null;
+  }
+  function clearNetwork(){
+    arcs.forEach(function(a){net.remove(a.grp);disposeObj(a.grp);});
+    markers.forEach(function(m){net.remove(m.grp);disposeObj(m.grp);});
+    planes.forEach(function(p){net.remove(p.sp);disposeObj(p.sp);});
+    rings.forEach(function(r){net.remove(r);disposeObj(r);});
+    if(originGrp){net.remove(originGrp);disposeObj(originGrp);originGrp=null;}
+    arcs=[];markers=[];planes=[];rings=[];
+  }
+  function arcPts(a,b,seg){
+    var s=a.clone().normalize(),e=b.clone().normalize(),ang=s.angleTo(e),out=[],
+        lift=0.09+0.22*Math.min(1,ang/Math.PI);
+    for(var i=0;i<=seg;i++){var t=i/seg,v;
+      if(ang<1e-4){v=s.clone();}
+      else{v=s.clone().multiplyScalar(Math.sin((1-t)*ang)).add(e.clone().multiplyScalar(Math.sin(t*ang))).divideScalar(Math.sin(ang)).normalize();}
+      v.multiplyScalar(R*(1+lift*Math.sin(Math.PI*t)));out.push(v);}
+    return out;
+  }
+  /* build network for current origin/dest selection */
+  function buildNetwork(){
+    clearNetwork();
+    state.hoveredDest=-1;
+    G.destIndex=[];
+    if(!state.origin) return;
+    var o=AIRPORTS[state.origin];
+    var dests=currentDestinations();
+
+    /* origin marker: dot + expanding radar rings */
+    var oPos=latLon(o.lat,o.lon,R*1.006);
+    originGrp=new THREE.Group(); originGrp.position.copy(oPos);
+    var og=new THREE.Sprite(new THREE.SpriteMaterial({map:GLOW,color:0xffb454,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:1}));
+    og.scale.setScalar(11); originGrp.add(og);
+    originGrp.add(new THREE.Mesh(new THREE.SphereGeometry(1.5,12,12),new THREE.MeshBasicMaterial({color:0xffffff})));
+    var olt=labelTex(o.code+" · "+cityName(o));
+    var olab=new THREE.Sprite(new THREE.SpriteMaterial({map:olt,transparent:true,depthWrite:false,opacity:.95}));
+    var osc=0.085; olab.scale.set(olt.userData.w*osc,olt.userData.h*osc,1);
+    olab.center.set(0.05,-0.6); originGrp.add(olab);
+    net.add(originGrp);
+    for(var ri=0;ri<3;ri++){
+      var ring=new THREE.Sprite(new THREE.SpriteMaterial({map:RING,color:0xffb454,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0}));
+      ring.position.copy(oPos); ring.userData={phase:ri/3}; net.add(ring); rings.push(ring);
+    }
+
+    var now=performance.now();
+    dests.sort(function(a,b){return a.dist-b.dist;});
+    var showLabels = dests.length<=40;   // big hubs: labels on hover only (skip texture cost)
+    dests.forEach(function(d,i){
+      var B=AIRPORTS[d.code];
+      var a=latLon(o.lat,o.lon,R), b=latLon(B.lat,B.lon,R);
+      var seg=d.dist<2000?32:(d.dist<6000?48:64);
+      var curve=new THREE.CatmullRomCurve3(arcPts(a,b,seg));
+      var sel=!!state.dest;
+      var col=sel?0xffb454:0x3fd6ff;
+      var grp=new THREE.Group();
+      var halo=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,1.35,6,false),
+        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.09,blending:THREE.AdditiveBlending,depthWrite:false}));
+      var core=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,0.42,6,false),
+        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.62,blending:THREE.AdditiveBlending,depthWrite:false}));
+      grp.add(halo);grp.add(core);net.add(grp);
+      var idxPerSeg=6*6; /* radialSegments(6) * 6 indices */
+      var arc={grp:grp,halo:halo,core:core,curve:curve,seg:seg,idxPerSeg:idxPerSeg,dest:d.code,
+               born:now+(state.reduced?0:Math.min(i,90)*22),drawn:state.reduced?1:0,baseCore:.62,baseHalo:.09};
+      if(!state.reduced){ halo.geometry.setDrawRange(0,0); core.geometry.setDrawRange(0,0); }
+      arcs.push(arc);
+
+      /* destination marker */
+      var mPos=latLon(B.lat,B.lon,R*1.006);
+      var mg=new THREE.Group(); mg.position.copy(mPos);
+      var glow=new THREE.Sprite(new THREE.SpriteMaterial({map:GLOW,color:sel?0xffcf87:0x9fd8ff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0}));
+      glow.scale.setScalar(7.5); mg.add(glow);
+      var dot=new THREE.Mesh(new THREE.SphereGeometry(1.05,10,10),new THREE.MeshBasicMaterial({color:0xffffff}));
+      mg.add(dot);
+      var lab=null;
+      if(showLabels){
+        var lt=labelTex(B.code);
+        lab=new THREE.Sprite(new THREE.SpriteMaterial({map:lt,transparent:true,depthWrite:false,opacity:0}));
+        var sc=0.075; lab.scale.set(lt.userData.w*sc,lt.userData.h*sc,1);
+        lab.center.set(-0.15,0.5); mg.add(lab);
+      }
+      net.add(mg);
+      markers.push({grp:mg,glow:glow,lab:lab,code:d.code,world:new THREE.Vector3(),sx:0,sy:0,facing:0,
+                    born:arc.born+(state.reduced?0:420),data:d});
+
+      /* planes on selected route (or ambient on first few arcs) */
+      var wantPlane = sel || (i<8);
+      if(wantPlane && !state.reduced){
+        var pn=sel?Math.min(2,d.flights.length):1;
+        for(var k=0;k<pn;k++){
+          var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:PLANE,color:sel?0xffd9a0:0xbfeaff,transparent:true,depthWrite:false,opacity:0}));
+          sp.scale.setScalar(4.6); net.add(sp);
+          planes.push({sp:sp,curve:curve,t:(k*0.5+((h32(d.code)%40)/100))%1,speed:0.028+ (h32(d.code+k)%12)/1000,arcRef:arc});
+        }
+      }
+      G.destIndex.push(markers[markers.length-1]);
+    });
+  }
+  G.buildNetwork=buildNetwork;
+
+  /* ---- interaction ---- */
+  var rotX=0.18,rotY=-2.05,dragging=false,lx=0,ly=0,velX=0,velY=0,moved=0,downT=0;
+  var flyAnim=null;
+  function flyTo(code,cb){
+    var ap=AIRPORTS[code]; if(!ap) return;
+    var p=latLon(ap.lat,ap.lon,1);
+    var ty=Math.atan2(-p.x,p.z), tx=Math.atan2(p.y,Math.sqrt(p.x*p.x+p.z*p.z));
+    tx=Math.max(-1.15,Math.min(1.15,tx));
+    var sy=rotY, sx=rotX;
+    var dy=ty-((sy%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+    /* shortest wrap */
+    var cur=((sy%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+    dy=ty-cur; if(dy>Math.PI)dy-=Math.PI*2; if(dy<-Math.PI)dy+=Math.PI*2;
+    if(state.reduced){ rotY=sy+dy; rotX=tx; if(cb)cb(); return; }
+    flyAnim={t0:performance.now(),dur:1050,sy:sy,sx:sx,dy:dy,dx:tx-sx,cb:cb};
+  }
+  G.flyTo=flyTo;
+
+  var dom=renderer.domElement;
+  dom.addEventListener('pointerdown',function(e){dragging=true;lx=e.clientX;ly=e.clientY;moved=0;downT=Date.now();velX=velY=0;flyAnim=null;dom.setPointerCapture(e.pointerId);});
+  window.addEventListener('pointermove',function(e){
+    if(dragging){var dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
+      rotY+=dx*0.006;rotX+=dy*0.006;rotX=Math.max(-1.15,Math.min(1.15,rotX));velY=dx*0.006;velX=dy*0.006;}
+    hover(e);
+  });
+  window.addEventListener('pointerup',function(){
+    if(dragging&&moved<6&&(Date.now()-downT)<400&&state.hoveredDest>=0){
+      var mk=markers[state.hoveredDest];
+      if(mk){ UI.selectDest(mk.code); }
+    }
+    dragging=false;
+  });
+  dom.addEventListener('wheel',function(e){e.preventDefault();camera.position.z=Math.max(165,Math.min(460,camera.position.z+e.deltaY*0.12));},{passive:false});
+  dom.addEventListener('pointerleave',function(){if(!dragging){state.hoveredDest=-1;tipEl.classList.remove('on');}});
+
+  var tipEl=document.getElementById('tip');
+  function hover(e){
+    if(dragging)return;
+    var rect=dom.getBoundingClientRect();
+    if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom){return;}
+    var mx=e.clientX-rect.left,my=e.clientY-rect.top,best=-1,bd=22;
+    for(var i=0;i<markers.length;i++){var m=markers[i];if(m.facing<0.1)continue;
+      var d=Math.hypot(m.sx-mx,m.sy-my);if(d<bd){bd=d;best=i;}}
+    if(best!==state.hoveredDest){ state.hoveredDest=best; UI.syncListHighlight(best>=0?markers[best].code:null); }
+    if(best>=0){showTip(markers[best],rect);}else{tipEl.classList.remove('on');}
+  }
+  function showTip(m,rect){
+    var B=AIRPORTS[m.code], d=m.data;
+    var html='<div class="tp-code">'+m.code+'</div><div class="tp-city">'+cityName(B)+'</div>'+
+      '<div class="tp-sub">'+d.dist.toLocaleString()+' km · '+d.flights.length+' '+T('flightsDay')+'</div>'+
+      '<div class="tp-sub" style="color:var(--amber)">'+T('tipFrom')+' $'+d.minPrice+'</div>'+
+      (state.dest?'':'<div class="tp-cta">'+T('tipCta')+'</div>');
+    tipEl.innerHTML=html;tipEl.classList.add('on');
+    var tx=m.sx+16,ty=m.sy-12;
+    if(tx+250>rect.width)tx=m.sx-250;if(ty<6)ty=6;
+    tipEl.style.left=tx+'px';tipEl.style.top=ty+'px';
+  }
+
+  document.getElementById('btn-rot').addEventListener('click',function(){
+    state.autoRotate=!state.autoRotate;
+    this.setAttribute('aria-pressed',state.autoRotate);
+    this.querySelector('span').textContent=state.autoRotate?T('rotOn'):T('rotOff');
+  });
+  document.getElementById('btn-reset').addEventListener('click',function(){
+    camera.position.z=315;
+    if(state.origin){flyTo(state.origin);}else{rotX=0.18;rotY=-2.05;}
+    velX=velY=0;
+  });
+
+  /* ---- render loop ---- */
+  var clock=new THREE.Clock(),camDir=new THREE.Vector3(),tmp=new THREE.Vector3(),tmp2=new THREE.Vector3();
+  function ease(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
+  function animate(){
+    requestAnimationFrame(animate);
+    var dt=Math.min(0.05,clock.getDelta()),now=performance.now();
+    if(flyAnim){
+      var k=Math.min(1,(now-flyAnim.t0)/flyAnim.dur),e2=ease(k);
+      rotY=flyAnim.sy+flyAnim.dy*e2; rotX=flyAnim.sx+flyAnim.dx*e2;
+      if(k>=1){var cb=flyAnim.cb;flyAnim=null;if(cb)cb();}
+    } else if(!dragging){
+      rotY+=velY;rotX+=velX;velY*=0.93;velX*=0.93;rotX=Math.max(-1.15,Math.min(1.15,rotX));
+      if(state.autoRotate&&!state.origin)rotY+=0.0014;
+    }
+    globe.rotation.y=rotY;globe.rotation.x=rotX;globe.updateWorldMatrix(true,false);
+    camDir.copy(camera.position).normalize();
+    var Wc=stage.clientWidth,Hc=stage.clientHeight;
+
+    /* arcs draw-in */
+    for(var i=0;i<arcs.length;i++){var a=arcs[i];
+      if(a.drawn<1){
+        var t=(now-a.born)/620; if(t<0)t=0; if(t>1)t=1;
+        a.drawn=t; var e3=1-Math.pow(1-t,3);
+        var segs=Math.floor(e3*a.seg);
+        a.core.geometry.setDrawRange(0,segs*a.idxPerSeg);
+        a.halo.geometry.setDrawRange(0,segs*a.idxPerSeg);
+      }
+      var hov=state.hoveredDest>=0&&markers[state.hoveredDest]&&markers[state.hoveredDest].code===a.dest;
+      var anyHov=state.hoveredDest>=0;
+      var tc=anyHov?(hov?0.95:0.10):a.baseCore;
+      var th=anyHov?(hov?0.22:0.03):a.baseHalo;
+      a.core.material.opacity+=(tc-a.core.material.opacity)*0.12;
+      a.halo.material.opacity+=(th-a.halo.material.opacity)*0.12;
+    }
+    /* markers */
+    for(var m2=0;m2<markers.length;m2++){var m=markers[m2];
+      m.grp.getWorldPosition(m.world);tmp.copy(m.world).normalize();
+      m.facing=tmp.dot(camDir);
+      var v=m.world.clone().project(camera);
+      m.sx=(v.x*0.5+0.5)*Wc;m.sy=(-v.y*0.5+0.5)*Hc;
+      var vis=now>m.born;
+      var hov2=(state.hoveredDest===m2);
+      var gt=vis?(state.hoveredDest>=0?(hov2?1.2:0.15):(0.45+0.5*Math.max(0,m.facing))):0;
+      m.glow.material.opacity+=(gt-m.glow.material.opacity)*0.14;
+      m.glow.scale.setScalar(7.5+(hov2?4:0));
+      if(m.lab){
+        var lt2=vis&&m.facing>0.3?(state.hoveredDest>=0?(hov2?1:0.1):(markers.length<=28?0.85:0)):0;
+        if(markers.length>28&&hov2)lt2=1;
+        m.lab.material.opacity+=(lt2-m.lab.material.opacity)*0.16;
+      }
+    }
+    /* origin rings */
+    for(var r2=0;r2<rings.length;r2++){var rg=rings[r2];
+      var ph=((now/1800)+rg.userData.phase)%1;
+      rg.scale.setScalar(4+ph*26);
+      rg.material.opacity=(1-ph)*0.5;
+    }
+    if(originGrp){
+      originGrp.getWorldPosition(tmp2);
+      var of=tmp2.clone().normalize().dot(camDir);
+      originGrp.visible=of>-0.1;
+      for(var r3=0;r3<rings.length;r3++)rings[r3].visible=of>0.05;
+    }
+    /* planes */
+    for(var p2=0;p2<planes.length;p2++){var pl=planes[p2];
+      if(pl.arcRef.drawn<1){pl.sp.material.opacity=0;continue;}
+      pl.t+=dt*pl.speed;if(pl.t>1)pl.t-=1;
+      pl.curve.getPointAt(pl.t,tmp);
+      pl.sp.position.copy(tmp);                       /* local coords (child of globe) */
+      var wpos=tmp.applyMatrix4(globe.matrixWorld);    /* -> world (tmp already copied) */
+      var w1=wpos.clone().project(camera);
+      var pf=wpos.clone().normalize().dot(camDir);
+      var t2=Math.min(1,pl.t+0.012);
+      pl.curve.getPointAt(t2,tmp2);
+      var w2=tmp2.applyMatrix4(globe.matrixWorld).clone().project(camera);
+      pl.sp.material.rotation=Math.atan2(w2.y-w1.y,w2.x-w1.x);
+      var fade=Math.sin(Math.PI*pl.t);
+      var anyH=state.hoveredDest>=0;
+      var mine=anyH&&markers[state.hoveredDest]&&markers[state.hoveredDest].code===pl.arcRef.dest;
+      pl.sp.material.opacity=(pf>0?1:0)*fade*(anyH?(mine?1:0.08):0.9);
+    }
+    renderer.render(scene,camera);
+  }
+  animate();
+
+  function onResize(){var W2=stage.clientWidth,H2=stage.clientHeight;camera.aspect=W2/H2;camera.updateProjectionMatrix();renderer.setSize(W2,H2);}
+  if(window.ResizeObserver){new ResizeObserver(onResize).observe(stage);}else{window.addEventListener('resize',onResize);}
+}
+
+/* =====================================================================
+   UI LAYER
+   ===================================================================== */
+var UI={};
+function initUI(){
+  var inpO=document.getElementById('inp-o'),inpD=document.getElementById('inp-d');
+  var ac=document.getElementById('ac'),listEl=document.getElementById('list');
+  var acItems=[],acActive=-1,acTarget=null;
+
+  /* ---- search ---- */
+  function searchAirports(q){
+    q=q.trim().toLowerCase(); if(!q)return[];
+    var res=[];
+    for(var i=0;i<AP_LIST.length;i++){
+      var ap=AP_LIST[i], pos=ap.hay.indexOf(q);
+      if(pos<0) continue;
+      var score, cl=ap.code.toLowerCase();
+      if(cl===q) score=1000;
+      else if(cl.indexOf(q)===0) score=820;
+      else if(ap.cityZh===q||ap.cityEn.toLowerCase()===q) score=600;
+      else if(ap.cityEn.toLowerCase().indexOf(q)===0||ap.cityZh.indexOf(q)===0) score=440;
+      else score=200-Math.min(120,pos);
+      score += Math.min(80,(DEG[ap.code]||0)*0.6);   // prioritise busier hubs
+      res.push([score,ap]);
+    }
+    res.sort(function(a,b){return b[0]-a[0];});
+    return res.slice(0,8).map(function(x){return x[1];});
+  }
+  function renderAc(items,target){
+    acItems=items;acActive=-1;acTarget=target;
+    if(!items.length){ac.style.display='none';return;}
+    ac.innerHTML=items.map(function(ap,i){
+      return '<div class="ac-item" role="option" data-i="'+i+'">'+
+        '<span class="ac-code">'+ap.code+'</span>'+
+        '<span class="ac-name">'+cityName(ap)+' · '+apName(ap)+'</span>'+
+        '<span class="ac-sub">'+ap.country+'</span></div>';
+    }).join('');
+    var top=(target===inpO?document.getElementById('wrap-o'):document.getElementById('wrap-d'));
+    ac.style.top=(top.offsetTop+top.offsetHeight+2)+'px';
+    ac.style.display='block';
+    Array.prototype.forEach.call(ac.children,function(el){
+      el.addEventListener('pointerdown',function(e){e.preventDefault();pick(+el.getAttribute('data-i'));});
+    });
+  }
+  function hideAc(){ac.style.display='none';acItems=[];acActive=-1;}
+  function pick(i){
+    var ap=acItems[i];if(!ap)return;
+    if(acTarget===inpO){ setOrigin(ap.code); } else { setDest(ap.code); }
+    hideAc();
+  }
+  function onKey(e){
+    if(ac.style.display==='none')return;
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      e.preventDefault();
+      acActive+=(e.key==='ArrowDown'?1:-1);
+      acActive=(acActive+acItems.length)%acItems.length;
+      Array.prototype.forEach.call(ac.children,function(el,i){el.classList.toggle('active',i===acActive);});
+    } else if(e.key==='Enter'){ e.preventDefault(); pick(acActive>=0?acActive:0); }
+    else if(e.key==='Escape'){ hideAc(); }
+  }
+  [inpO,inpD].forEach(function(inp){
+    inp.addEventListener('input',function(){
+      document.getElementById(inp===inpO?'wrap-o':'wrap-d').classList.toggle('has-value',!!inp.value);
+      renderAc(searchAirports(inp.value),inp);
+    });
+    inp.addEventListener('focus',function(){ if(inp.value)renderAc(searchAirports(inp.value),inp); });
+    inp.addEventListener('keydown',onKey);
+    inp.addEventListener('blur',function(){ setTimeout(hideAc,140); });
+  });
+  document.getElementById('clr-o').addEventListener('click',function(){ setOrigin(null); });
+  document.getElementById('clr-d').addEventListener('click',function(){ setDest(null); });
+  document.getElementById('btn-swap').addEventListener('click',function(){
+    var o=state.origin,d=state.dest;
+    if(!o&&!d)return;
+    if(d&&ROUTE_MAP[d]){ state.origin=d; state.dest=(o&&(ROUTE_MAP[d]||{})[o])?o:(o||null); }
+    else if(o&&!d){ return; }
+    else { return; }
+    syncInputs(); G.buildNetwork(); G.flyTo(state.origin); renderList();
+  });
+
+  /* hot chips */
+  var HOT=['MNL','CEB','PVG','PEK','CAN','XMN'];
+  var chipsEl=document.getElementById('chips');
+  HOT.forEach(function(c){
+    var b=document.createElement('button');b.className='chip';
+    b.textContent=c+' '+(AIRPORTS[c]?cityName(AIRPORTS[c]):'');
+    b.addEventListener('click',function(){setOrigin(c);});
+    b.setAttribute('data-chip',c);
+    chipsEl.appendChild(b);
+  });
+  function refreshChips(){
+    Array.prototype.forEach.call(chipsEl.querySelectorAll('.chip'),function(b){
+      var c=b.getAttribute('data-chip');
+      b.textContent=c+' '+cityName(AIRPORTS[c]);
+    });
+  }
+
+  /* ---- selection ---- */
+  function setOrigin(code){
+    state.origin=code; state.hoveredDest=-1; state.region='all'; state.timeBand='all'; state.alFilter='all';
+    if(!code || state.dest===code){ state.dest=null; }   /* keep pre-entered destination */
+    if(code){ state.autoRotate=false; }
+    var rb=document.getElementById('btn-rot');
+    rb.setAttribute('aria-pressed',state.autoRotate);
+    rb.querySelector('span').textContent=state.autoRotate?T('rotOn'):T('rotOff');
+    syncInputs();
+    G.buildNetwork();
+    if(code)G.flyTo(code);
+    renderList();
+  }
+  function setDest(code){
+    state.timeBand='all'; state.alFilter='all';
+    if(code&&!state.origin){ state.dest=code; syncInputs(); renderList(); return; }
+    if(code&&state.origin&&!(ROUTE_MAP[state.origin]||{})[code]){ state.dest=code; syncInputs(); G.buildNetwork(); renderList(); return; }
+    state.dest=code;
+    syncInputs(); G.buildNetwork(); renderList();
+  }
+  UI.selectDest=function(code){ setDest(code); };
+  function syncInputs(){
+    inpO.value=state.origin?(state.origin+' · '+cityName(AIRPORTS[state.origin])):'';
+    inpD.value=state.dest?(state.dest+' · '+cityName(AIRPORTS[state.dest])):'';
+    document.getElementById('wrap-o').classList.toggle('has-value',!!state.origin);
+    document.getElementById('wrap-d').classList.toggle('has-value',!!state.dest);
+    var pn=document.getElementById('partial-note');
+    pn.style.display='none';
+  }
+
+  /* ---- sorting ---- */
+  document.getElementById('sort-row').addEventListener('click',function(e){
+    var b=e.target.closest('.sort-btn');if(!b)return;
+    state.sort=b.getAttribute('data-sort');
+    Array.prototype.forEach.call(this.querySelectorAll('.sort-btn'),function(x){x.classList.toggle('on',x===b);});
+    renderList();
+  });
+
+  /* ---- list render ---- */
+  function setStats(nd,nf,na){
+    document.getElementById('st-dest').textContent=nd==null?'—':nd;
+    document.getElementById('st-flt').textContent=nf==null?'—':nf;
+    document.getElementById('st-al').textContent=na==null?'—':na;
+  }
+  function timeBandOf(m){ m=((m%1440)+1440)%1440; return m<360?'night':(m<720?'morning':(m<1080?'afternoon':'evening')); }
+  var regRow=document.getElementById('region-row'), fltFilter=document.getElementById('flt-filter');
+  function renderRegionRow(){
+    var regs=availableRegions();
+    if(regs.length<=1){ regRow.style.display='none'; regRow.innerHTML=''; state.region='all'; return; }
+    var h='<button class="fchip'+(state.region==='all'?' on':'')+'" data-reg="all">'+T('regAll')+'</button>';
+    regs.forEach(function(r){ h+='<button class="fchip'+(state.region===r?' on':'')+'" data-reg="'+r+'">'+T('reg'+r)+'</button>'; });
+    regRow.innerHTML=h; regRow.style.display='flex';
+    Array.prototype.forEach.call(regRow.querySelectorAll('.fchip'),function(ch){
+      ch.addEventListener('click',function(){ state.region=ch.getAttribute('data-reg'); G.buildNetwork(); renderList(); });
+    });
+  }
+  function renderFlightFilter(flAll){
+    var als={}; flAll.forEach(function(f){als[f.al]=1;}); var alCodes=Object.keys(als);
+    var bands=[['all','ffAll'],['morning','ffMorning'],['afternoon','ffAfternoon'],['evening','ffEvening'],['night','ffNight']];
+    var h='<span class="fl-label">'+T('ffTime')+'</span>';
+    bands.forEach(function(b){ h+='<button class="fchip amber'+(state.timeBand===b[0]?' on':'')+'" data-tb="'+b[0]+'">'+T(b[1])+'</button>'; });
+    if(alCodes.length>1){
+      h+='<select id="al-sel" aria-label="'+T('ffAirline')+'"><option value="all">'+T('ffAirline')+' · '+T('ffAll')+'</option>';
+      alCodes.forEach(function(c){ h+='<option value="'+c+'"'+(state.alFilter===c?' selected':'')+'>'+alName(c)+'</option>'; });
+      h+='</select>';
+    }
+    fltFilter.innerHTML=h; fltFilter.style.display='flex';
+    Array.prototype.forEach.call(fltFilter.querySelectorAll('.fchip'),function(ch){
+      ch.addEventListener('click',function(){ state.timeBand=ch.getAttribute('data-tb'); renderList(); });
+    });
+    var sel=fltFilter.querySelector('#al-sel');
+    if(sel) sel.addEventListener('change',function(){ state.alFilter=sel.value; renderList(); });
+  }
+  function renderList(){
+    var el=listEl;
+    if(!state.origin){
+      document.getElementById('sort-row').style.display='none';
+      regRow.style.display='none'; fltFilter.style.display='none';
+      setStats(null,null,null);
+      el.innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3a17 17 0 0 1 0 18M12 3a17 17 0 0 0 0 18"/></svg><div>'+
+        T(state.dest?'emptyNeedOrigin':'emptyInit')+'</div></div>';
+      return;
+    }
+    if(state.dest){
+      var sel=getDestinations(state.origin).filter(function(d){return d.code===state.dest;});
+      var o=AIRPORTS[state.origin],B=AIRPORTS[state.dest];
+      document.getElementById('sort-row').style.display='none'; regRow.style.display='none';
+      if(!sel.length){
+        fltFilter.style.display='none';
+        setStats(0,0,0);
+        el.innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M12 3v4m0 10v4M3 12h4m10 0h4"/><circle cx="12" cy="12" r="9"/></svg><div>'+T('emptyNoRoute')+'</div></div>';
+        return;
+      }
+      var d=sel[0],flAll=d.flights.slice();
+      flAll.sort(function(a,b){return a.price-b.price;});
+      var alsAll={};flAll.forEach(function(f){alsAll[f.al]=1;});
+      setStats(1,flAll.length,Object.keys(alsAll).length);
+      renderFlightFilter(flAll);
+      var fl=flAll.filter(function(f){
+        if(state.alFilter!=='all'&&f.al!==state.alFilter) return false;
+        if(state.timeBand!=='all'&&timeBandOf(f.dep)!==state.timeBand) return false;
+        return true;
+      });
+      var html='<div class="route-head"><span class="rh-codes">'+state.origin+
+        '<svg viewBox="0 0 24 24"><path d="M21.5 15.5v-2l-8.5-5V3a1.5 1.5 0 0 0-3 0v5.5l-8.5 5v2l8.5-2.5v5l-2.5 2v1.5l4-1 4 1V20l-2.5-2v-5z"/></svg>'+state.dest+
+        '</span><span class="rh-sub">'+d.dist.toLocaleString()+' km · '+fl.length+'/'+flAll.length+' '+T('routeFlights')+'</span></div>';
+      if(!fl.length){ html+='<div class="empty-state" style="margin:18px 14px">'+T('ffNoMatch')+'</div>'; }
+      fl.forEach(function(f,i){
+        html+='<div class="flight-card" style="animation-delay:'+(state.reduced?0:Math.min(i,20)*36)+'ms">'+
+          '<div class="fc-top"><span class="al-logo" style="background:'+alColor(f.al)+'">'+f.al+'</span>'+
+          '<span class="fc-airline">'+alName(f.al)+'</span><span class="fc-no">'+f.no+'</span>'+
+          '<span class="fc-ac">'+f.ac+'</span></div>'+
+          '<div class="fc-route">'+
+            '<div class="fc-time">'+fmtTime(f.dep)+'<small>'+state.origin+'</small></div>'+
+            '<div class="fc-line"><span class="fc-dur">'+fmtDur(f.dur)+'</span><svg viewBox="0 0 24 24"><path d="M21.5 15.5v-2l-8.5-5V3a1.5 1.5 0 0 0-3 0v5.5l-8.5 5v2l8.5-2.5v5l-2.5 2v1.5l4-1 4 1V20l-2.5-2v-5z"/></svg></div>'+
+            '<div class="fc-time">'+fmtTime(f.arr)+(f.plus>0?'<span class="plus1">+1</span>':'')+'<small>'+state.dest+'</small></div>'+
+          '</div>'+
+          '<div class="fc-bottom"><span class="fc-days">'+T('daily')+'</span>'+
+          '<span class="fc-price">$'+f.price+'<small>'+T('priceRef')+'</small></span></div></div>';
+      });
+      el.innerHTML=html;
+      return;
+    }
+    /* network mode */
+    document.getElementById('sort-row').style.display='flex';
+    fltFilter.style.display='none';
+    renderRegionRow();
+    var dests=currentDestinations();
+    var nf=0,als={};
+    dests.forEach(function(d){nf+=d.flights.length;d.carriers.forEach(function(c){als[c]=1;});});
+    setStats(dests.length,nf,Object.keys(als).length);
+    if(state.sort==='dist')dests.sort(function(a,b){return a.dist-b.dist;});
+    else if(state.sort==='price')dests.sort(function(a,b){return a.minPrice-b.minPrice;});
+    else dests.sort(function(a,b){return b.flights.length-a.flights.length;});
+    var html='';
+    dests.forEach(function(d,i){
+      var B=AIRPORTS[d.code];
+      var dots=d.carriers.slice(0,4).map(function(c){
+        return '<i style="background:'+alColor(c)+'" title="'+alName(c)+'">'+c.charAt(0)+'</i>';
+      }).join('');
+      html+='<div class="dest-card" role="listitem" tabindex="0" data-code="'+d.code+'" style="animation-delay:'+(state.reduced?0:Math.min(i,16)*30)+'ms">'+
+        '<div class="dest-code">'+d.code+'<small>'+(B.cc||'')+'</small></div>'+
+        '<div class="dest-mid"><div class="dest-city">'+cityName(B)+'</div>'+
+        '<div class="dest-meta">'+d.dist.toLocaleString()+' km · '+d.flights.length+' '+T('flightsDay')+' · '+d.carriers.length+' '+T('carriersN')+'</div></div>'+
+        '<div class="dest-right"><div class="dest-price">$'+d.minPrice+'<small>'+T('priceRef')+'</small></div>'+
+        '<div class="carrier-dots">'+dots+'</div></div></div>';
+    });
+    el.innerHTML=html;
+    Array.prototype.forEach.call(el.querySelectorAll('.dest-card'),function(card){
+      var code=card.getAttribute('data-code');
+      card.addEventListener('click',function(){setDest(code);});
+      card.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();setDest(code);}});
+      card.addEventListener('mouseenter',function(){highlightMarker(code,true);});
+      card.addEventListener('mouseleave',function(){highlightMarker(code,false);});
+    });
+  }
+  function highlightMarker(code,on){
+    if(!G.destIndex)return;
+    if(!on){ state.hoveredDest=-1; return; }
+    for(var i=0;i<G.destIndex.length;i++){
+      if(G.destIndex[i].code===code){ state.hoveredDest=i; return; }
+    }
+  }
+  UI.syncListHighlight=function(code){
+    Array.prototype.forEach.call(listEl.querySelectorAll('.dest-card'),function(card){
+      card.classList.toggle('hi',code&&card.getAttribute('data-code')===code);
+    });
+  };
+  UI.renderList=renderList;
+
+  /* language */
+  document.getElementById('btn-lang').addEventListener('click',function(){
+    LANG=LANG==='zh'?'en':'zh';
+    applyI18n(); refreshChips(); syncInputs(); renderList();
+    if(state.origin){ G.buildNetwork(); } /* rebuild labels in new language */
+  });
+
+  applyI18n();
+  renderList();
+}
+
+/* ---- bootstrap (runs last, after all vars & functions are defined) ---- */
+(function initWait(){
+  var tries=0;
+  (function w(){
+    if(typeof THREE==='undefined'){ if(tries++<160){ return setTimeout(w,50); }
+      document.getElementById('fallback').style.display='grid'; return; }
+    try{ initGlobe(); initUI(); }
+    catch(e){ console.error(e); document.getElementById('fallback').style.display='grid'; }
+  })();
+})();
+</script>
+</body>
+</html>
