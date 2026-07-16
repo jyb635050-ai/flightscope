@@ -195,11 +195,17 @@
 
   @media (max-width:880px){
     #app{flex-direction:column}
-    .stage{order:1;height:46%;flex:none}
-    .panel{order:2;width:100%;min-width:0;flex:1;border-right:0;border-top:1px solid var(--line)}
+    .stage{order:1;height:44%;flex:none}
+    .panel{order:2;width:100%;min-width:0;flex:1;min-height:0;overflow-y:auto;
+      border-right:0;border-top:1px solid var(--line)}
+    #list{flex:none;overflow:visible}         /* whole panel scrolls as one sheet */
     .brand{padding:12px 16px 8px}
     .search-zone{padding:0 16px}
     .ac-list{left:16px;right:16px}
+    .input-wrap input{font-size:16px;height:48px}   /* ≥16px: no iOS focus auto-zoom */
+    .chip{padding:9px 14px;font-size:13px}          /* bigger touch targets */
+    .sort-btn,.fchip{padding:8px 13px;font-size:12.5px}
+    .g-btn{height:38px}
   }
   @media (prefers-reduced-motion:reduce){
     .dest-card,.flight-card{animation:none}
@@ -1087,10 +1093,19 @@ function initGlobe(){
       var sel=!!state.dest;
       var col=sel?0xffb454:0x3fd6ff;
       var grp=new THREE.Group();
-      var halo=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,0.95,6,false),
-        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.045,blending:THREE.AdditiveBlending,depthWrite:false}));
-      var core=new THREE.Mesh(new THREE.TubeGeometry(curve,seg,0.32,6,false),
-        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.38,blending:THREE.AdditiveBlending,depthWrite:false}));
+      /* end-fade via vertex colors: with additive blending, dark ends add ~nothing,
+         so dozens of arcs stacking at the origin no longer blow out to white */
+      function endFade(geo,radial){
+        var n=geo.attributes.position.count, ring=radial+1, rings=n/ring-1, cbuf=new Float32Array(n*3);
+        for(var vi=0;vi<n;vi++){ var t=Math.floor(vi/ring)/rings;
+          var b=Math.min(1,Math.min(t,1-t)/0.16); b=0.05+0.95*b*b;
+          cbuf[vi*3]=b;cbuf[vi*3+1]=b;cbuf[vi*3+2]=b; }
+        geo.setAttribute('color',new THREE.BufferAttribute(cbuf,3)); return geo;
+      }
+      var halo=new THREE.Mesh(endFade(new THREE.TubeGeometry(curve,seg,0.95,6,false),6),
+        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.045,blending:THREE.AdditiveBlending,depthWrite:false,vertexColors:true}));
+      var core=new THREE.Mesh(endFade(new THREE.TubeGeometry(curve,seg,0.32,6,false),6),
+        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.38,blending:THREE.AdditiveBlending,depthWrite:false,vertexColors:true}));
       grp.add(halo);grp.add(core);net.add(grp);
       var idxPerSeg=6*6; /* radialSegments(6) * 6 indices */
       var arc={grp:grp,halo:halo,core:core,curve:curve,seg:seg,idxPerSeg:idxPerSeg,dest:d.code,
@@ -1150,19 +1165,36 @@ function initGlobe(){
   G.flyTo=flyTo;
 
   var dom=renderer.domElement;
-  dom.addEventListener('pointerdown',function(e){dragging=true;lx=e.clientX;ly=e.clientY;moved=0;downT=Date.now();velX=velY=0;flyAnim=null;dom.setPointerCapture(e.pointerId);});
+  var touches={};                                    /* pointerId -> [x,y] (for pinch zoom) */
+  function touchCount(){ return Object.keys(touches).length; }
+  function pinchDist(){ var k=Object.keys(touches),a=touches[k[0]],b=touches[k[1]]; return Math.hypot(a[0]-b[0],a[1]-b[1]); }
+  var pinchStart=0, pinchZ0=0;
+  dom.addEventListener('pointerdown',function(e){
+    touches[e.pointerId]=[e.clientX,e.clientY];
+    if(touchCount()===2){ dragging=false; pinchStart=pinchDist(); pinchZ0=camera.position.z; return; }
+    dragging=true;lx=e.clientX;ly=e.clientY;moved=0;downT=Date.now();velX=velY=0;flyAnim=null;dom.setPointerCapture(e.pointerId);
+  });
   window.addEventListener('pointermove',function(e){
+    if(touches[e.pointerId]) touches[e.pointerId]=[e.clientX,e.clientY];
+    if(touchCount()===2){                            /* pinch to zoom */
+      var d=pinchDist();
+      if(pinchStart>0&&d>0) camera.position.z=Math.max(165,Math.min(460,pinchZ0*pinchStart/d));
+      return;
+    }
     if(dragging){var dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
       rotY+=dx*0.006;rotX+=dy*0.006;rotX=Math.max(-1.15,Math.min(1.15,rotX));velY=dx*0.006;velX=dy*0.006;}
     hover(e);
   });
-  window.addEventListener('pointerup',function(){
+  window.addEventListener('pointerup',function(e){
+    delete touches[e.pointerId];
+    if(touchCount()<2) pinchStart=0;
     if(dragging&&moved<6&&(Date.now()-downT)<400&&state.hoveredDest>=0){
       var mk=markers[state.hoveredDest];
       if(mk){ UI.selectDest(mk.code); }
     }
     dragging=false;
   });
+  window.addEventListener('pointercancel',function(e){ delete touches[e.pointerId]; if(touchCount()<2)pinchStart=0; dragging=false; });
   dom.addEventListener('wheel',function(e){e.preventDefault();camera.position.z=Math.max(165,Math.min(460,camera.position.z+e.deltaY*0.12));},{passive:false});
   dom.addEventListener('pointerleave',function(){if(!dragging){state.hoveredDest=-1;tipEl.classList.remove('on');}});
 
