@@ -196,6 +196,10 @@
   .g-btn:hover{border-color:var(--line-2);background:rgba(30,48,92,.7);color:#fff}
   .g-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
   .stage-hint{position:absolute;right:18px;bottom:14px;z-index:6;font-size:11px;color:var(--t3);letter-spacing:.04em;pointer-events:none}
+  .toast{position:absolute;left:50%;top:20px;transform:translate(-50%,-14px);z-index:20;pointer-events:none;
+    padding:9px 16px;border-radius:99px;font-size:12.5px;font-weight:600;color:#04070f;background:var(--cyan);
+    box-shadow:0 8px 30px rgba(63,214,255,.35);opacity:0;transition:opacity .2s,transform .2s;white-space:nowrap}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
   .map-load{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;pointer-events:none;
     font:500 10.5px var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:#7f96c2;transition:opacity .4s}
   .map-load::before{content:"";display:inline-block;width:7px;height:7px;margin-right:9px;border-radius:50%;
@@ -318,6 +322,9 @@
     <h2 class="sr-only" data-i18n="srGlobe">交互式 3D 地球：显示所选出发机场的直飞航线网络，拖拽旋转，滚轮缩放，悬停查看目的地，点击目的地查看航班。</h2>
     <div id="holder"></div>
     <div class="stage-controls">
+      <button class="g-btn" id="btn-share" aria-label="Share">
+        <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.7l7.4-4.3M8.3 13.3l7.4 4.3"/></svg><span data-i18n="share">分享</span>
+      </button>
       <button class="g-btn" id="btn-lang" aria-label="Switch language">EN</button>
       <button class="g-btn" id="btn-rot" aria-pressed="true">
         <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg><span data-i18n="rotOn">旋转中</span>
@@ -326,6 +333,7 @@
         <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg><span data-i18n="reset">重置</span>
       </button>
     </div>
+    <div class="toast" id="toast"></div>
     <div class="map-load" id="map-load" data-i18n="mapLoad">正在构建地图</div>
     <div class="g-tip" id="tip"></div>
     <div class="stage-hint" data-i18n="hint">拖拽旋转 · 滚轮缩放 · 悬停/点击目的地</div>
@@ -355,6 +363,7 @@ var I18N = {
     dscTitle:'数据说明',
     dscBody:'航线拓扑来自 OpenFlights 开放数据集（历史存量，约 2014 年，部分航线已变动）；机型取自该数据集的真实执飞机型记录；航班号、时刻、票价为规则生成的参考值，非实时。预订前请以航司官网为准。',
     mapLoad:'正在构建地图', rotOn:'旋转中', rotOff:'已暂停', reset:'重置',
+    share:'分享', copied:'链接已复制，去粘贴给朋友吧', shareRoute:'分享这条航线', shareOrigin:'分享该出发地',
     hint:'拖拽旋转 · 滚轮缩放 · 悬停/点击目的地', noWebgl:'此浏览器不支持 WebGL',
     srGlobe:'交互式 3D 地球：显示所选出发机场的直飞航线网络。',
     partialNote:'',
@@ -375,6 +384,7 @@ var I18N = {
     dscTitle:'Data notes',
     dscBody:'Route topology from the OpenFlights open dataset (historical, ~2014; some routes have since changed); aircraft from its real equipment records; flight numbers, times and fares are rule-generated reference values, not live. Verify on airline sites before booking.',
     mapLoad:'Building map', rotOn:'Spinning', rotOff:'Paused', reset:'Reset',
+    share:'Share', copied:'Link copied — paste it to a friend', shareRoute:'Share this route', shareOrigin:'Share this origin',
     hint:'Drag to spin · scroll to zoom · hover / click a destination', noWebgl:'WebGL is not available in this browser',
     srGlobe:'Interactive 3D globe showing nonstop route network of the selected origin airport.',
     partialNote:'Only routes to/from the Philippines & China are included for this airport',
@@ -1465,6 +1475,33 @@ function initUI(){
     });
   }
 
+  /* ---- shareable deep links ---- */
+  function buildShareURL(){
+    var p=[];
+    if(state.origin) p.push('from='+state.origin);
+    if(state.dest)   p.push('to='+state.dest);
+    if(LANG==='en')  p.push('lang=en');
+    return location.origin+location.pathname+(p.length?('?'+p.join('&')):'');
+  }
+  function updateURL(){ try{ history.replaceState(null,'',buildShareURL()); }catch(e){} }
+  var toastTimer=null;
+  function toast(msg){
+    var t=document.getElementById('toast'); if(!t)return;
+    t.textContent=msg; t.classList.add('on');
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove('on'); },2600);
+  }
+  function doShare(){
+    var url=buildShareURL();
+    var title='FlightScope · '+T('tagline');
+    var text = state.dest ? (cityName(AIRPORTS[state.origin])+' → '+cityName(AIRPORTS[state.dest]))
+             : state.origin ? (cityName(AIRPORTS[state.origin])+' '+T('stDest')) : title;
+    if(navigator.share){ navigator.share({title:title,text:text,url:url}).catch(function(){}); return; }
+    var done=function(){ toast(T('copied')); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ legacyCopy(url); done(); }); }
+    else { legacyCopy(url); done(); }
+  }
+  function legacyCopy(txt){ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} document.body.removeChild(ta); }
+
   /* ---- selection ---- */
   function setOrigin(code){
     state.origin=code; state.hoveredDest=-1; state.region='all'; state.timeBand='all'; state.alFilter='all';
@@ -1493,6 +1530,7 @@ function initUI(){
     document.getElementById('wrap-d').classList.toggle('has-value',!!state.dest);
     var pn=document.getElementById('partial-note');
     pn.style.display='none';
+    updateURL();
   }
 
   /* ---- sorting ---- */
@@ -1640,10 +1678,27 @@ function initUI(){
     LANG=LANG==='zh'?'en':'zh';
     applyI18n(); refreshChips(); syncInputs(); renderList();
     if(state.origin){ G.buildNetwork(); } /* rebuild labels in new language */
+    updateURL();
   });
+
+  /* share */
+  document.getElementById('btn-share').addEventListener('click',doShare);
 
   applyI18n();
   renderList();
+
+  /* ---- open a shared link:  ?from=CAN&to=DPS&lang=en ---- */
+  (function applyURLParams(){
+    var q; try{ q=new URLSearchParams(location.search); }catch(e){ return; }
+    var lg=(q.get('lang')||'').toLowerCase();
+    if(lg==='en'&&LANG!=='en'){ LANG='en'; applyI18n(); refreshChips(); }
+    var from=(q.get('from')||'').toUpperCase().replace(/[^A-Z]/g,'');
+    var to=(q.get('to')||'').toUpperCase().replace(/[^A-Z]/g,'');
+    if(from&&AIRPORTS[from]){
+      setOrigin(from);
+      if(to&&AIRPORTS[to]&&to!==from) setDest(to);
+    }
+  })();
 }
 
 /* ---- bootstrap (runs last, after all vars & functions are defined) ---- */
