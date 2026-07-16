@@ -30,6 +30,27 @@
 
   #app{display:flex;width:100%;height:100vh;height:100dvh}
 
+  /* ---- boot loader ---- */
+  #boot{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(120% 90% at 50% 42%,#0d1836 0%,#070c1d 48%,#03040b 100%);
+    transition:opacity .6s ease;}
+  #boot.hide{opacity:0;pointer-events:none;}
+  .boot-inner{text-align:center;transform:translateY(-4%);}
+  .boot-logo{width:64px;height:64px;margin:0 auto 18px;border-radius:18px;display:grid;place-items:center;
+    background:linear-gradient(135deg,rgba(63,214,255,.2),rgba(63,214,255,.04));border:1px solid var(--line-2);
+    box-shadow:0 0 40px rgba(63,214,255,.25);animation:bootFloat 3s ease-in-out infinite;}
+  .boot-logo svg{width:34px;height:34px;fill:var(--cyan);}
+  .boot-title{font:700 28px/1 var(--font-disp);letter-spacing:.02em;
+    background:linear-gradient(92deg,#fff,#9fd4ff 60%,#c8a6ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .boot-sub{margin-top:6px;font-size:12.5px;color:var(--t2);letter-spacing:.18em;text-transform:uppercase;}
+  .boot-bar{width:190px;height:3px;margin:26px auto 12px;border-radius:3px;background:rgba(122,168,255,.14);overflow:hidden;}
+  .boot-bar i{display:block;width:40%;height:100%;border-radius:3px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+    animation:bootSlide 1.15s ease-in-out infinite;}
+  .boot-tip{font-size:11.5px;color:var(--t3);letter-spacing:.04em;}
+  @keyframes bootSlide{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}
+  @keyframes bootFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  @media (prefers-reduced-motion:reduce){ .boot-logo,.boot-bar i{animation:none} }
+
   /* ---------------- left panel ---------------- */
   .panel{
     width:392px;min-width:392px;height:100%;display:flex;flex-direction:column;z-index:5;
@@ -214,6 +235,15 @@
 </style>
 </head>
 <body>
+<div id="boot">
+  <div class="boot-inner">
+    <div class="boot-logo"><svg viewBox="0 0 24 24"><path d="M21.5 15.5v-2l-8.5-5V3a1.5 1.5 0 0 0-3 0v5.5l-8.5 5v2l8.5-2.5v5l-2.5 2v1.5l4-1 4 1V20l-2.5-2v-5z"/></svg></div>
+    <div class="boot-title">FlightScope</div>
+    <div class="boot-sub" data-i18n="tagline">直飞航线探索</div>
+    <div class="boot-bar"><i></i></div>
+    <div class="boot-tip" data-i18n="bootTip">正在加载全球航线数据…</div>
+  </div>
+</div>
 <div id="app">
   <!-- ================= left panel ================= -->
   <aside class="panel">
@@ -315,7 +345,7 @@
 /* ---------------- i18n ---------------- */
 var I18N = {
   zh:{
-    tagline:'直飞航线探索', demoChip:'示例数据', from:'出发地', to:'目的地（可选）',
+    tagline:'直飞航线探索', bootTip:'正在加载全球航线数据…', demoChip:'示例数据', from:'出发地', to:'目的地（可选）',
     phFrom:'城市 / 机场代码，如 马尼拉 或 MNL', phTo:'留空 = 查看全部直飞目的地',
     hot:'热门出发地', stDest:'直飞目的地', stFlt:'参考航班/日', stAl:'承运航司',
     sortDist:'按距离', sortPrice:'按价格', sortFlt:'按航班数',
@@ -335,7 +365,7 @@ var I18N = {
     ffTime:'时段', ffAll:'全部', ffMorning:'上午', ffAfternoon:'下午', ffEvening:'晚上', ffNight:'凌晨', ffAirline:'航司', ffNoMatch:'当前筛选无匹配航班', clearFilter:'清除筛选'
   },
   en:{
-    tagline:'Direct Route Explorer', demoChip:'DEMO DATA', from:'From', to:'To (optional)',
+    tagline:'Direct Route Explorer', bootTip:'Loading global route data…', demoChip:'DEMO DATA', from:'From', to:'To (optional)',
     phFrom:'City / airport code, e.g. Manila or MNL', phTo:'Leave empty to see all nonstop destinations',
     hot:'Popular origins', stDest:'Nonstop destinations', stFlt:'Ref. flights/day', stAl:'Carriers',
     sortDist:'Distance', sortPrice:'Price', sortFlt:'Flights',
@@ -497,6 +527,22 @@ var CURATED = {};
 AIRPORT_ROWS.forEach(function(r){ CURATED[r[0]] = {nameEn:r[1],nameZh:r[2],cityEn:r[3],cityZh:r[4],country:r[5],lat:r[6],lon:r[7],tz:r[8]}; });
 
 /* Build global airport map from OpenFlights, then overlay curated bilingual names. */
+/* Chinese names for popular tourism/hub airports (overlaid on OpenFlights; unknown codes ignored).  code:[cityZh, nameZh] */
+var CN_NAMES = {
+ "HKT":["普吉","普吉国际机场"],"USM":["苏梅岛","苏梅机场"],"KBV":["甲米","甲米机场"],"HDY":["合艾","合艾国际机场"],"URT":["素叻他尼","素叻他尼机场"],
+ "OKA":["冲绳","那霸机场"],"KOJ":["鹿儿岛","鹿儿岛机场"],"HIJ":["广岛","广岛机场"],"SDJ":["仙台","仙台机场"],"KMJ":["熊本","熊本机场"],"ISG":["石垣岛","石垣机场"],"HKD":["函馆","函馆机场"],"NGS":["长崎","长崎机场"],"OIT":["大分","大分机场"],"TAK":["高松","高松机场"],"KIJ":["新潟","新潟机场"],"KMQ":["小松","小松机场"],"AXT":["秋田","秋田机场"],
+ "CJU":["济州岛","济州国际机场"],"TAE":["大邱","大邱国际机场"],"KWJ":["光州","光州机场"],
+ "SUB":["泗水","泗水朱安达机场"],"JOG":["日惹","日惹国际机场"],"LOP":["龙目岛","龙目国际机场"],"BPN":["巴厘巴板","苏丹阿吉·穆罕默德机场"],"UPG":["望加锡","苏丹哈桑丁机场"],"KNO":["棉兰","瓜拉纳穆国际机场"],
+ "BKI":["亚庇","亚庇国际机场"],"PEN":["槟城","槟城国际机场"],"LGK":["兰卡威","兰卡威国际机场"],"KCH":["古晋","古晋国际机场"],"JHB":["新山","士乃国际机场"],
+ "PQC":["富国岛","富国国际机场"],"CXR":["芽庄","金兰国际机场"],"DLI":["大叻","连姜机场"],"HPH":["海防","吉碑国际机场"],"HUI":["顺化","富牌机场"],"VCA":["芹苴","芹苴国际机场"],
+ "REP":["暹粒","暹粒吴哥国际机场"],"KOS":["西哈努克","西哈努克国际机场"],"MDL":["曼德勒","曼德勒国际机场"],"LPQ":["琅勃拉邦","琅勃拉邦国际机场"],
+ "DEL":["德里","英迪拉·甘地国际机场"],"BOM":["孟买","贾特拉帕蒂·希瓦吉机场"],"MAA":["金奈","金奈国际机场"],"BLR":["班加罗尔","班加罗尔国际机场"],"HYD":["海得拉巴","拉吉夫·甘地机场"],"CCU":["加尔各答","加尔各答国际机场"],"COK":["科钦","科钦国际机场"],"GOI":["果阿","达波利姆机场"],"MLE":["马累","马累国际机场"],"PKR":["博卡拉","博卡拉国际机场"],
+ "SHJ":["沙迦","沙迦国际机场"],"MED":["麦地那","麦地那王子机场"],"AMM":["安曼","阿勒娅王后国际机场"],"BEY":["贝鲁特","贝鲁特国际机场"],"TLV":["特拉维夫","本-古里安机场"],"BGW":["巴格达","巴格达国际机场"],
+ "BCN":["巴塞罗那","巴塞罗那机场"],"MAD":["马德里","马德里巴拉哈斯机场"],"LIS":["里斯本","里斯本机场"],"OPO":["波尔图","波尔图机场"],"ATH":["雅典","雅典国际机场"],"VIE":["维也纳","维也纳国际机场"],"PRG":["布拉格","布拉格机场"],"BUD":["布达佩斯","布达佩斯机场"],"WAW":["华沙","肖邦机场"],"CPH":["哥本哈根","哥本哈根机场"],"OSL":["奥斯陆","奥斯陆机场"],"ARN":["斯德哥尔摩","阿兰达机场"],"DUB":["都柏林","都柏林机场"],"EDI":["爱丁堡","爱丁堡机场"],"MAN":["曼彻斯特","曼彻斯特机场"],"NCE":["尼斯","蓝色海岸机场"],"LYS":["里昂","里昂圣埃克絮佩里机场"],"VCE":["威尼斯","威尼斯机场"],"MXP":["米兰","马尔彭萨机场"],"NAP":["那不勒斯","那不勒斯机场"],"GVA":["日内瓦","日内瓦机场"],"BRU":["布鲁塞尔","布鲁塞尔机场"],"BER":["柏林","柏林勃兰登堡机场"],"HAM":["汉堡","汉堡机场"],"DUS":["杜塞尔多夫","杜塞尔多夫机场"],"STR":["斯图加特","斯图加特机场"],"SAW":["伊斯坦布尔","萨比哈·格克琴机场"],"AYT":["安塔利亚","安塔利亚机场"],"LED":["圣彼得堡","普尔科沃机场"],"KEF":["雷克雅未克","凯夫拉维克机场"],
+ "LAS":["拉斯维加斯","哈里·里德国际机场"],"MIA":["迈阿密","迈阿密国际机场"],"ORD":["芝加哥","奥黑尔国际机场"],"IAD":["华盛顿","杜勒斯国际机场"],"BOS":["波士顿","洛根国际机场"],"ATL":["亚特兰大","哈茨菲尔德-杰克逊机场"],"DFW":["达拉斯","达拉斯沃思堡机场"],"IAH":["休斯顿","布什洲际机场"],"DEN":["丹佛","丹佛国际机场"],"PHX":["凤凰城","天港国际机场"],"SAN":["圣地亚哥","圣地亚哥国际机场"],"MCO":["奥兰多","奥兰多国际机场"],"YUL":["蒙特利尔","特鲁多国际机场"],"YYC":["卡尔加里","卡尔加里国际机场"],"MEX":["墨西哥城","墨西哥城国际机场"],"CUN":["坎昆","坎昆国际机场"],"GRU":["圣保罗","瓜鲁柳斯国际机场"],"GIG":["里约热内卢","加利昂国际机场"],"EZE":["布宜诺斯艾利斯","埃塞萨国际机场"],"SCL":["圣地亚哥(智利)","圣地亚哥国际机场"],"LIM":["利马","豪尔赫·查韦斯机场"],"BOG":["波哥大","埃尔多拉多国际机场"],
+ "PER":["珀斯","珀斯机场"],"ADL":["阿德莱德","阿德莱德机场"],"CNS":["凯恩斯","凯恩斯机场"],"OOL":["黄金海岸","黄金海岸机场"],"CHC":["基督城","基督城机场"],"ZQN":["皇后镇","皇后镇机场"],"NAN":["楠迪","楠迪国际机场"],
+ "CPT":["开普敦","开普敦国际机场"],"HRG":["赫尔格达","赫尔格达国际机场"],"SSH":["沙姆沙伊赫","沙姆沙伊赫机场"],"RAK":["马拉喀什","马拉喀什机场"],"CMN":["卡萨布兰卡","穆罕默德五世机场"],"ZNZ":["桑给巴尔","桑给巴尔机场"],"MRU":["毛里求斯","毛里求斯机场"],"SEZ":["塞舌尔","塞舌尔国际机场"],"DAR":["达累斯萨拉姆","朱利叶斯·尼雷尔机场"]
+};
 var AIRPORTS = {}, AP_LIST = [];
 (function(){
   var A = window.OF_AP || [];
@@ -504,6 +550,7 @@ var AIRPORTS = {}, AP_LIST = [];
     var r=A[i], code=r[0];
     AIRPORTS[code] = { code:code, nameEn:r[1], nameZh:r[1], cityEn:r[2], cityZh:r[2], country:r[3], lat:r[4], lon:r[5], tz:(+r[6]||0), cc:cc(r[3]) };
   }
+  for(var cnc in CN_NAMES){ var cap=AIRPORTS[cnc]; if(cap){ cap.cityZh=CN_NAMES[cnc][0]; cap.nameZh=CN_NAMES[cnc][1]; } }
   for(var c in CURATED){ var cu=CURATED[c], ex=AIRPORTS[c]||{code:c,country:cu.country};
     ex.code=c; ex.nameEn=cu.nameEn; ex.nameZh=cu.nameZh; ex.cityEn=cu.cityEn; ex.cityZh=cu.cityZh;
     ex.lat=cu.lat; ex.lon=cu.lon; ex.tz=cu.tz; ex.cc=cu.country; if(!ex.country)ex.country=cu.country;
@@ -1600,13 +1647,18 @@ function initUI(){
 }
 
 /* ---- bootstrap (runs last, after all vars & functions are defined) ---- */
+function hideBoot(){ var b=document.getElementById('boot'); if(b&&!b.classList.contains('hide')){ b.classList.add('hide'); setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); },650); } }
+setTimeout(hideBoot, 7000);   /* hard safety net: never trap the user behind the loader */
 (function initWait(){
   var tries=0;
   (function w(){
     if(typeof THREE==='undefined'){ if(tries++<160){ return setTimeout(w,50); }
-      document.getElementById('fallback').style.display='grid'; return; }
-    try{ initGlobe(); initUI(); }
-    catch(e){ console.error(e); document.getElementById('fallback').style.display='grid'; }
+      document.getElementById('fallback').style.display='grid'; hideBoot(); return; }
+    try{
+      initGlobe(); initUI();
+      setTimeout(hideBoot, 350);   /* let the globe paint its first frame, then fade */
+    }
+    catch(e){ console.error(e); document.getElementById('fallback').style.display='grid'; hideBoot(); }
   })();
 })();
 </script>
